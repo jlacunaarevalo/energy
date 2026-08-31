@@ -1,0 +1,680 @@
+{
+  "target": "aspEnergy",
+  "feature_object": "aspAudioFeatures",
+  "n_tracks": 62,
+  "features": [
+    "relaxed",
+    "intensity",
+    "dynamic_range",
+    "acoustic",
+    "onset_rate",
+    "leq",
+    "tempo",
+    "happy"
+  ],
+  "feature_stats": {
+    "relaxed": {
+      "mean": 0.45906490111543286,
+      "std": 0.18513523246394467,
+      "min": 0.1257779449224472,
+      "max": 0.8949572443962097
+    },
+    "intensity": {
+      "mean": -0.4032258064516129,
+      "std": 0.4905453653466306,
+      "min": -1.0,
+      "max": 0.0
+    },
+    "dynamic_range": {
+      "mean": 4.302676441208009,
+      "std": 1.6221685256289669,
+      "min": 1.9609540700912476,
+      "max": 14.28182315826416
+    },
+    "acoustic": {
+      "mean": 0.3198395914007579,
+      "std": 0.20767095044663778,
+      "min": 0.055070843547582626,
+      "max": 0.8269659280776978
+    },
+    "onset_rate": {
+      "mean": 3.967704426857733,
+      "std": 0.7057887158727183,
+      "min": 2.501753091812134,
+      "max": 5.7783589363098145
+    },
+    "leq": {
+      "mean": -18.049252417779737,
+      "std": 1.0273409989510305,
+      "min": -20.416988372802734,
+      "max": -14.116783142089844
+    },
+    "tempo": {
+      "mean": 116.25564956665039,
+      "std": 24.174047386291967,
+      "min": 72.84965515136719,
+      "max": 172.2650909423828
+    },
+    "happy": {
+      "mean": 0.6214881630674485,
+      "std": 0.1697350141119504,
+      "min": 0.17626464366912842,
+      "max": 0.8957614302635193
+    }
+  },
+  "lasso_kept": [
+    "acoustic",
+    "happy",
+    "relaxed",
+    "voice",
+    "tempo",
+    "loudness",
+    "intensity",
+    "onset_rate",
+    "entropy",
+    "dynamic_range",
+    "larm",
+    "leq",
+    "key_C"
+  ],
+  "lasso_dropped": [
+    "danceability",
+    "aggressive",
+    "party",
+    "sad",
+    "instrumental",
+    "gender",
+    "energy",
+    "durationMs",
+    "initialSilence",
+    "finalSilence",
+    "language_probability",
+    "key_A",
+    "key_Ab",
+    "key_B",
+    "key_Bb",
+    "key_C#",
+    "key_D",
+    "key_E",
+    "key_Eb",
+    "key_F",
+    "key_F#",
+    "key_G",
+    "scale_major",
+    "scale_minor",
+    "language_en",
+    "language_es",
+    "language_it",
+    "language_other",
+    "language_pt"
+  ],
+  "formula": "-0.019298*dynamic_range + 0.063815*intensity + 0.044354*onset_rate - 0.436873*relaxed + 0.687504",
+  "sympy": "-0.019298*dynamic_range + 0.063815*intensity + 0.044354*onset_rate - 0.436873*relaxed + 0.687504",
+  "latex": "- 0.019298 dynamic_{range} + 0.063815 intensity + 0.044354 onset_{rate} - 0.436873 relaxed + 0.687504",
+  "chosen_index": 5,
+  "metrics": {
+    "r2": 0.9096,
+    "rmse": 0.039,
+    "mae": 0.0309,
+    "pearson_r": 0.9538
+  },
+  "equations": [
+    {
+      "index": 0,
+      "complexity": 1,
+      "loss": 0.016827703,
+      "sympy": "0.554173000000000",
+      "formula": "0.554173000000000",
+      "latex": "0.554173",
+      "r2": -0.0,
+      "rmse": 0.1297,
+      "mae": 0.1037
+    },
+    {
+      "index": 1,
+      "complexity": 5,
+      "loss": 0.0045605623,
+      "sympy": "0.828803 - 0.598248*relaxed",
+      "formula": "0.828803 - 0.598248*relaxed",
+      "latex": "0.828803 - 0.598248 relaxed",
+      "r2": 0.729,
+      "rmse": 0.0675,
+      "mae": 0.0531
+    },
+    {
+      "index": 2,
+      "complexity": 7,
+      "loss": 0.003926526,
+      "sympy": "0.132142*intensity - 0.35013*relaxed + 0.768184",
+      "formula": "0.132142*intensity - 0.35013*relaxed + 0.768184",
+      "latex": "0.132142 intensity - 0.35013 relaxed + 0.768184",
+      "r2": 0.7667,
+      "rmse": 0.0627,
+      "mae": 0.0475
+    },
+    {
+      "index": 3,
+      "complexity": 9,
+      "loss": 0.0029673956,
+      "sympy": "-0.026005*dynamic_range - 0.524506*relaxed + 0.906843",
+      "formula": "-0.026005*dynamic_range - 0.524506*relaxed + 0.906843",
+      "latex": "- 0.026005 dynamic_{range} - 0.524506 relaxed + 0.906843",
+      "r2": 0.8237,
+      "rmse": 0.0545,
+      "mae": 0.0446
+    },
+    {
+      "index": 4,
+      "complexity": 11,
+      "loss": 0.0021394712,
+      "sympy": "-0.022356*dynamic_range + 0.07393*intensity - 0.430011*relaxed + 0.877577",
+      "formula": "-0.022356*dynamic_range + 0.07393*intensity - 0.430011*relaxed + 0.877577",
+      "latex": "- 0.022356 dynamic_{range} + 0.07393 intensity - 0.430011 relaxed + 0.877577",
+      "r2": 0.8729,
+      "rmse": 0.0463,
+      "mae": 0.0367
+    },
+    {
+      "index": 5,
+      "complexity": 13,
+      "loss": 0.0015204209,
+      "sympy": "-0.019298*dynamic_range + 0.063815*intensity + 0.044354*onset_rate - 0.436873*relaxed + 0.687504",
+      "formula": "-0.019298*dynamic_range + 0.063815*intensity + 0.044354*onset_rate - 0.436873*relaxed + 0.687504",
+      "latex": "- 0.019298 dynamic_{range} + 0.063815 intensity + 0.044354 onset_{rate} - 0.436873 relaxed + 0.687504",
+      "r2": 0.9096,
+      "rmse": 0.039,
+      "mae": 0.0309
+    },
+    {
+      "index": 6,
+      "complexity": 15,
+      "loss": 0.0014841347,
+      "sympy": "-0.014951*dynamic_range + 0.07393*intensity + 0.034362*onset_rate - 0.430011*relaxed + 0.709373",
+      "formula": "-0.014951*dynamic_range + 0.07393*intensity + 0.034362*onset_rate - 0.430011*relaxed + 0.709373",
+      "latex": "- 0.014951 dynamic_{range} + 0.07393 intensity + 0.034362 onset_{rate} - 0.430011 relaxed + 0.709373",
+      "r2": 0.9118,
+      "rmse": 0.0385,
+      "mae": 0.0315
+    },
+    {
+      "index": 7,
+      "complexity": 17,
+      "loss": 0.0013001357,
+      "sympy": "-0.1011*acoustic - 0.021131*dynamic_range + 0.069878*intensity + 0.048567*onset_rate - 0.346468*relaxed + 0.671952",
+      "formula": "-0.1011*acoustic - 0.021131*dynamic_range + 0.069878*intensity + 0.048567*onset_rate - 0.346468*relaxed + 0.671952",
+      "latex": "- 0.1011 acoustic - 0.021131 dynamic_{range} + 0.069878 intensity + 0.048567 onset_{rate} - 0.346468 relaxed + 0.671952",
+      "r2": 0.9227,
+      "rmse": 0.0361,
+      "mae": 0.0288
+    },
+    {
+      "index": 8,
+      "complexity": 18,
+      "loss": 0.0011780824,
+      "sympy": "-0.02093*dynamic_range + 0.069212*intensity - 0.026747*onset_rate**2 + 0.260354*onset_rate - 0.4377*relaxed + 0.274438",
+      "formula": "-0.02093*dynamic_range + 0.069212*intensity - 0.026747*onset_rate**2 + 0.260354*onset_rate - 0.4377*relaxed + 0.274438",
+      "latex": "- 0.02093 dynamic_{range} + 0.069212 intensity - 0.026747 onset_{rate}^{2} + 0.260354 onset_{rate} - 0.4377 relaxed + 0.274438",
+      "r2": 0.93,
+      "rmse": 0.0343,
+      "mae": 0.0277
+    },
+    {
+      "index": 9,
+      "complexity": 19,
+      "loss": 0.0011780822,
+      "sympy": "-0.020931*dynamic_range + 0.069217*intensity - 0.026762*onset_rate**2 + 0.260479*onset_rate - 0.43775*relaxed + 0.274235",
+      "formula": "-0.020931*dynamic_range + 0.069217*intensity - 0.026762*onset_rate**2 + 0.260479*onset_rate - 0.43775*relaxed + 0.274235",
+      "latex": "- 0.020931 dynamic_{range} + 0.069217 intensity - 0.026762 onset_{rate}^{2} + 0.260479 onset_{rate} - 0.43775 relaxed + 0.274235",
+      "r2": 0.93,
+      "rmse": 0.0343,
+      "mae": 0.0277
+    },
+    {
+      "index": 10,
+      "complexity": 20,
+      "loss": 0.0011363372,
+      "sympy": "-0.346779*acoustic**2*onset_rate**2 + 2.751831*acoustic**2*onset_rate - 5.459227*acoustic**2 + 0.221827*acoustic*onset_rate**2 - 1.760289*acoustic*onset_rate + 3.492154*acoustic - 0.020659*dynamic_range + 0.068317*intensity - 0.035475*onset_rate**2 + 0.328987*onset_rate - 0.418835*relaxed + 0.125732",
+      "formula": "-0.346779*acoustic**2*onset_rate**2 + 2.751831*acoustic**2*onset_rate - 5.459227*acoustic**2 + 0.221827*acoustic*onset_rate**2 - 1.760289*acoustic*onset_rate + 3.492154*acoustic - 0.020659*dynamic_range + 0.068317*intensity - 0.035475*onset_rate**2 + 0.328987*onset_rate - 0.418835*relaxed + 0.125732",
+      "latex": "- 0.346779 acoustic^{2} onset_{rate}^{2} + 2.751831 acoustic^{2} onset_{rate} - 5.459227 acoustic^{2} + 0.221827 acoustic onset_{rate}^{2} - 1.760289 acoustic onset_{rate} + 3.492154 acoustic - 0.020659 dynamic_{range} + 0.068317 intensity - 0.035475 onset_{rate}^{2} + 0.328987 onset_{rate} - 0.418835 relaxed + 0.125732",
+      "r2": 0.9325,
+      "rmse": 0.0337,
+      "mae": 0.0261
+    }
+  ],
+  "predictions": [
+    {
+      "track": "FR10S1579416-PoutPourri_de_Navidad.flac",
+      "actual": 0.679,
+      "predicted": 0.6926,
+      "deviation": 0.0137,
+      "abs_deviation": 0.0137
+    },
+    {
+      "track": "GBAAM0201110-Every_Breath_You_Take.flac",
+      "actual": 0.4149,
+      "predicted": 0.395,
+      "deviation": -0.0199,
+      "abs_deviation": 0.0199
+    },
+    {
+      "track": "GBAHS1400094-Photograph.flac",
+      "actual": 0.2495,
+      "predicted": 0.2915,
+      "deviation": 0.0419,
+      "abs_deviation": 0.0419
+    },
+    {
+      "track": "GBAYE0800265-Viva_La_Vida.flac",
+      "actual": 0.5142,
+      "predicted": 0.491,
+      "deviation": -0.0232,
+      "abs_deviation": 0.0232
+    },
+    {
+      "track": "GBAYE1400217-A_Sky_Full_of_Stars.flac",
+      "actual": 0.5094,
+      "predicted": 0.5177,
+      "deviation": 0.0082,
+      "abs_deviation": 0.0082
+    },
+    {
+      "track": "MXUM71502002-Tu_Falta_De_Querer.flac",
+      "actual": 0.4737,
+      "predicted": 0.4448,
+      "deviation": -0.0289,
+      "abs_deviation": 0.0289
+    },
+    {
+      "track": "PEB029900008-Un_Vino__Una_Cerveza.flac",
+      "actual": 0.7774,
+      "predicted": 0.7354,
+      "deviation": -0.042,
+      "abs_deviation": 0.042
+    },
+    {
+      "track": "QM4TW1962326-No_Te_Contaron_Mal.flac",
+      "actual": 0.6638,
+      "predicted": 0.6772,
+      "deviation": 0.0135,
+      "abs_deviation": 0.0135
+    },
+    {
+      "track": "QM6MZ2214877-Me_Porto_Bonito.flac",
+      "actual": 0.4788,
+      "predicted": 0.5144,
+      "deviation": 0.0355,
+      "abs_deviation": 0.0355
+    },
+    {
+      "track": "QM6MZ2214882-Neverita.flac",
+      "actual": 0.465,
+      "predicted": 0.458,
+      "deviation": -0.007,
+      "abs_deviation": 0.007
+    },
+    {
+      "track": "QM6MZ2214884-Efecto.flac",
+      "actual": 0.1914,
+      "predicted": 0.2045,
+      "deviation": 0.0131,
+      "abs_deviation": 0.0131
+    },
+    {
+      "track": "QM6MZ2214891-Otro_Atardecer.flac",
+      "actual": 0.4174,
+      "predicted": 0.4007,
+      "deviation": -0.0166,
+      "abs_deviation": 0.0166
+    },
+    {
+      "track": "QM7282306255-LAGUNAS.flac",
+      "actual": 0.2826,
+      "predicted": 0.3155,
+      "deviation": 0.0329,
+      "abs_deviation": 0.0329
+    },
+    {
+      "track": "QMFME2364182-MONACO.flac",
+      "actual": 0.4753,
+      "predicted": 0.4923,
+      "deviation": 0.0169,
+      "abs_deviation": 0.0169
+    },
+    {
+      "track": "QMFMF2447067-PIToRRO_DE_COCO.flac",
+      "actual": 0.5279,
+      "predicted": 0.5591,
+      "deviation": 0.0312,
+      "abs_deviation": 0.0312
+    },
+    {
+      "track": "QMFMF2447069-EoO.flac",
+      "actual": 0.6765,
+      "predicted": 0.6548,
+      "deviation": -0.0217,
+      "abs_deviation": 0.0217
+    },
+    {
+      "track": "QMFMF2447070-DtMF.flac",
+      "actual": 0.4609,
+      "predicted": 0.4471,
+      "deviation": -0.0138,
+      "abs_deviation": 0.0138
+    },
+    {
+      "track": "QMZSY1600015-Let_Me_Love_You.flac",
+      "actual": 0.5176,
+      "predicted": 0.5065,
+      "deviation": -0.0111,
+      "abs_deviation": 0.0111
+    },
+    {
+      "track": "QT5M22560359-MONTAGEM_RUGADA.flac",
+      "actual": 0.6431,
+      "predicted": 0.671,
+      "deviation": 0.0278,
+      "abs_deviation": 0.0278
+    },
+    {
+      "track": "QZ7B82500302-no_tiene_sentido.flac",
+      "actual": 0.4826,
+      "predicted": 0.5068,
+      "deviation": 0.0241,
+      "abs_deviation": 0.0241
+    },
+    {
+      "track": "QZS1Z1600275-Diles.flac",
+      "actual": 0.5261,
+      "predicted": 0.476,
+      "deviation": -0.0502,
+      "abs_deviation": 0.0502
+    },
+    {
+      "track": "QZWT32210000-QUE_VUELVAS.flac",
+      "actual": 0.5941,
+      "predicted": 0.6067,
+      "deviation": 0.0125,
+      "abs_deviation": 0.0125
+    },
+    {
+      "track": "SEAYD8001020-The_Winner_Takes_It_All.flac",
+      "actual": 0.5943,
+      "predicted": 0.5061,
+      "deviation": -0.0882,
+      "abs_deviation": 0.0882
+    },
+    {
+      "track": "SEUM71301326-Wake_Me_Up.flac",
+      "actual": 0.6427,
+      "predicted": 0.6157,
+      "deviation": -0.027,
+      "abs_deviation": 0.027
+    },
+    {
+      "track": "TCACC1438995-I_Love_You_So.flac",
+      "actual": 0.3642,
+      "predicted": 0.4275,
+      "deviation": 0.0633,
+      "abs_deviation": 0.0633
+    },
+    {
+      "track": "US7VG2138926-Disjockey.flac",
+      "actual": 0.6687,
+      "predicted": 0.771,
+      "deviation": 0.1023,
+      "abs_deviation": 0.1023
+    },
+    {
+      "track": "USAT21203287-Locked_out_of_Heaven.flac",
+      "actual": 0.6952,
+      "predicted": 0.6543,
+      "deviation": -0.0409,
+      "abs_deviation": 0.0409
+    },
+    {
+      "track": "USAT21206701-When_I_Was_Your_Man.flac",
+      "actual": 0.1831,
+      "predicted": 0.25,
+      "deviation": 0.0669,
+      "abs_deviation": 0.0669
+    },
+    {
+      "track": "USAT21602948-That_s_What_I_Like.flac",
+      "actual": 0.6865,
+      "predicted": 0.6796,
+      "deviation": -0.0069,
+      "abs_deviation": 0.0069
+    },
+    {
+      "track": "USDXS1600316-Sola__Remix_.flac",
+      "actual": 0.677,
+      "predicted": 0.6508,
+      "deviation": -0.0262,
+      "abs_deviation": 0.0262
+    },
+    {
+      "track": "USEE11300353-Hotel_California_-_2013_Remaster.flac",
+      "actual": 0.5882,
+      "predicted": 0.5214,
+      "deviation": -0.0669,
+      "abs_deviation": 0.0669
+    },
+    {
+      "track": "USGF18714809-Sweet_Child_O__Mine.flac",
+      "actual": 0.7534,
+      "predicted": 0.7028,
+      "deviation": -0.0505,
+      "abs_deviation": 0.0505
+    },
+    {
+      "track": "USIR20400274-Mr__Brightside.flac",
+      "actual": 0.6802,
+      "predicted": 0.7063,
+      "deviation": 0.0261,
+      "abs_deviation": 0.0261
+    },
+    {
+      "track": "USQX91701275-See_You_Again__feat__Kali_Uchis_.flac",
+      "actual": 0.5274,
+      "predicted": 0.5235,
+      "deviation": -0.004,
+      "abs_deviation": 0.004
+    },
+    {
+      "track": "USQX91802457-Babydoll.flac",
+      "actual": 0.5896,
+      "predicted": 0.6443,
+      "deviation": 0.0547,
+      "abs_deviation": 0.0547
+    },
+    {
+      "track": "USQX92403295-Tu\u0301_Con_E\u0301l.flac",
+      "actual": 0.6474,
+      "predicted": 0.7368,
+      "deviation": 0.0894,
+      "abs_deviation": 0.0894
+    },
+    {
+      "track": "USQX92403929-Khe\u0301_.flac",
+      "actual": 0.4497,
+      "predicted": 0.4203,
+      "deviation": -0.0294,
+      "abs_deviation": 0.0294
+    },
+    {
+      "track": "USQX92404984-Que\u0301_Pasari\u0301a___.flac",
+      "actual": 0.6416,
+      "predicted": 0.6165,
+      "deviation": -0.0251,
+      "abs_deviation": 0.0251
+    },
+    {
+      "track": "USRW29600011-Everlong.flac",
+      "actual": 0.6535,
+      "predicted": 0.6784,
+      "deviation": 0.025,
+      "abs_deviation": 0.025
+    },
+    {
+      "track": "USSD11300197-Propuesta_Indecente.flac",
+      "actual": 0.4965,
+      "predicted": 0.4812,
+      "deviation": -0.0153,
+      "abs_deviation": 0.0153
+    },
+    {
+      "track": "USSD11300464-Eres_Mi\u0301a.flac",
+      "actual": 0.5465,
+      "predicted": 0.554,
+      "deviation": 0.0075,
+      "abs_deviation": 0.0075
+    },
+    {
+      "track": "USSD11600299-Chantaje__feat__Maluma_.flac",
+      "actual": 0.5929,
+      "predicted": 0.5961,
+      "deviation": 0.0033,
+      "abs_deviation": 0.0033
+    },
+    {
+      "track": "USSD11800257-X__feat__Maluma___Ozuna__-_Remix.flac",
+      "actual": 0.5382,
+      "predicted": 0.5415,
+      "deviation": 0.0032,
+      "abs_deviation": 0.0032
+    },
+    {
+      "track": "USSM10107256-Chop_Suey_.flac",
+      "actual": 0.6814,
+      "predicted": 0.6877,
+      "deviation": 0.0063,
+      "abs_deviation": 0.0063
+    },
+    {
+      "track": "USSM10107264-Aerials.flac",
+      "actual": 0.6642,
+      "predicted": 0.6652,
+      "deviation": 0.001,
+      "abs_deviation": 0.001
+    },
+    {
+      "track": "USSM10309029-Hoy_-_Spanish_Version.flac",
+      "actual": 0.4049,
+      "predicted": 0.4005,
+      "deviation": -0.0044,
+      "abs_deviation": 0.0044
+    },
+    {
+      "track": "USSM10501700-La_tortura.flac",
+      "actual": 0.6276,
+      "predicted": 0.673,
+      "deviation": 0.0454,
+      "abs_deviation": 0.0454
+    },
+    {
+      "track": "USSM12200612-As_It_Was.flac",
+      "actual": 0.4222,
+      "predicted": 0.4606,
+      "deviation": 0.0384,
+      "abs_deviation": 0.0384
+    },
+    {
+      "track": "USSM16700357-Brown_Eyed_Girl.flac",
+      "actual": 0.6601,
+      "predicted": 0.6086,
+      "deviation": -0.0515,
+      "abs_deviation": 0.0515
+    },
+    {
+      "track": "USUM71023200-Only_Girl__In_The_World_.flac",
+      "actual": 0.7081,
+      "predicted": 0.6903,
+      "deviation": -0.0178,
+      "abs_deviation": 0.0178
+    },
+    {
+      "track": "USUM71700626-Believer.flac",
+      "actual": 0.6926,
+      "predicted": 0.6531,
+      "deviation": -0.0395,
+      "abs_deviation": 0.0395
+    },
+    {
+      "track": "USUM72205906-PROVENZA.flac",
+      "actual": 0.4388,
+      "predicted": 0.4111,
+      "deviation": -0.0277,
+      "abs_deviation": 0.0277
+    },
+    {
+      "track": "USUM72222541-TQG.flac",
+      "actual": 0.4926,
+      "predicted": 0.4917,
+      "deviation": -0.001,
+      "abs_deviation": 0.001
+    },
+    {
+      "track": "USUM72318216-LUNA.flac",
+      "actual": 0.6252,
+      "predicted": 0.5884,
+      "deviation": -0.0368,
+      "abs_deviation": 0.0368
+    },
+    {
+      "track": "USUM72409273-Die_With_A_Smile.flac",
+      "actual": 0.5235,
+      "predicted": 0.4762,
+      "deviation": -0.0472,
+      "abs_deviation": 0.0472
+    },
+    {
+      "track": "USWB10002407-In_the_End.flac",
+      "actual": 0.6245,
+      "predicted": 0.6301,
+      "deviation": 0.0056,
+      "abs_deviation": 0.0056
+    },
+    {
+      "track": "USWB19800160-Iris.flac",
+      "actual": 0.5246,
+      "predicted": 0.4996,
+      "deviation": -0.025,
+      "abs_deviation": 0.025
+    },
+    {
+      "track": "USWB19901214-Take_on_Me.flac",
+      "actual": 0.7707,
+      "predicted": 0.6778,
+      "deviation": -0.0929,
+      "abs_deviation": 0.0929
+    },
+    {
+      "track": "USWL11900076-Me_Rehu\u0301so.flac",
+      "actual": 0.5778,
+      "predicted": 0.6152,
+      "deviation": 0.0374,
+      "abs_deviation": 0.0374
+    },
+    {
+      "track": "USWU30200093-Bring_Me_To_Life.flac",
+      "actual": 0.6174,
+      "predicted": 0.6263,
+      "deviation": 0.0089,
+      "abs_deviation": 0.0089
+    },
+    {
+      "track": "USXDR1700554-Dile_Que_Tu_Me_Quieres.flac",
+      "actual": 0.5371,
+      "predicted": 0.5802,
+      "deviation": 0.0431,
+      "abs_deviation": 0.0431
+    },
+    {
+      "track": "UYB282508143-TU_VAS_SIN__fav_.flac",
+      "actual": 0.527,
+      "predicted": 0.5862,
+      "deviation": 0.0592,
+      "abs_deviation": 0.0592
+    }
+  ]
+}

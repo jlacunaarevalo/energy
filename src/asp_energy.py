@@ -5,7 +5,8 @@ and other track metadata are ignored. Categorical fields inside
 ``aspAudioFeatures`` (``key``, ``scale``, language code) are one-hot encoded;
 the nested language-probability blob is reduced to the detected code plus its
 confidence. Features are standardized before the penalty so L1/L2 are not
-dominated by ``energy`` / ``durationMs`` scale.
+dominated by ``energy`` / ``durationMs`` scale. Lasso drops near-zero weights
+via ``SelectFromModel`` and refits on the surviving columns.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import numpy as np
 import pandas as pd
 from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
+from sklearn.feature_selection import SelectFromModel
 from sklearn.linear_model import LassoCV, LinearRegression, RidgeCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import BaseCrossValidator, KFold, LeaveOneOut, cross_val_predict
@@ -59,6 +61,7 @@ FEATURE_OBJECT = "aspAudioFeatures"
 
 LASSO_ALPHAS = np.logspace(-4, 1, 40)
 RIDGE_ALPHAS = np.logspace(-2, 4, 40)
+LASSO_COEF_THRESHOLD = 1e-10
 RANDOM_STATE = 42
 
 
@@ -70,7 +73,7 @@ def extract_feature_row(asp: dict[str, Any]) -> dict[str, Any]:
     """Flatten one ``aspAudioFeatures`` object into a model row (no target)."""
     language = asp.get("language") or {}
     row: dict[str, Any] = {
-        name: asp[name] for name in NUMERIC_FEATURES if name != "language_probability"
+        name: asp.get(name) for name in NUMERIC_FEATURES if name != "language_probability"
     }
     probability = language.get("probability")
     row["language_probability"] = 0.0 if probability is None else probability
@@ -134,20 +137,26 @@ def make_preprocessor() -> ColumnTransformer:
     )
 
 
+def _lasso_cv() -> LassoCV:
+    return LassoCV(
+        alphas=LASSO_ALPHAS,
+        cv=_inner_cv(),
+        max_iter=50_000,
+        random_state=RANDOM_STATE,
+        n_jobs=-1,
+    )
+
+
 def make_lasso() -> Pipeline:
+    """Lasso that drops near-zero coefficients, then refits Lasso on the rest."""
     return Pipeline(
         [
             ("prep", make_preprocessor()),
             (
-                "model",
-                LassoCV(
-                    alphas=LASSO_ALPHAS,
-                    cv=_inner_cv(),
-                    max_iter=50_000,
-                    random_state=RANDOM_STATE,
-                    n_jobs=-1,
-                ),
+                "select",
+                SelectFromModel(_lasso_cv(), threshold=LASSO_COEF_THRESHOLD),
             ),
+            ("model", _lasso_cv()),
         ]
     )
 
@@ -201,8 +210,49 @@ def _round(value: float | None, digits: int = 6) -> float | None:
     return round(float(value), digits)
 
 
+def _strip_encoder_prefix(name: str) -> str:
+    return name.replace("num__", "").replace("cat__", "")
+
+
+def _prep_names(pipeline: Pipeline) -> list[str]:
+    return [_strip_encoder_prefix(n) for n in pipeline.named_steps["prep"].get_feature_names_out()]
+
+
 def feature_names(pipeline: Pipeline) -> list[str]:
-    return list(pipeline.named_steps["prep"].get_feature_names_out())
+    names = list(pipeline.named_steps["prep"].get_feature_names_out())
+    select = pipeline.named_steps.get("select")
+    if select is not None:
+        names = list(select.get_feature_names_out(names))
+    return names
+
+
+def lasso_selection(pipeline: Pipeline) -> dict[str, list[str]]:
+    """Encoded feature names kept vs dropped by the Lasso selector."""
+    if "select" not in pipeline.named_steps:
+        kept = [_strip_encoder_prefix(n) for n in feature_names(pipeline)]
+        return {"kept": kept, "dropped": []}
+    all_names = _prep_names(pipeline)
+    mask = np.asarray(pipeline.named_steps["select"].get_support(), dtype=bool)
+    kept = [name for name, keep in zip(all_names, mask) if keep]
+    dropped = [name for name, keep in zip(all_names, mask) if not keep]
+    return {"kept": kept, "dropped": dropped}
+
+
+def selected_numeric_features(pipeline: Pipeline) -> list[str]:
+    """Original numeric columns whose Lasso coefficient survived the drop."""
+    kept = set(lasso_selection(pipeline)["kept"])
+    return [name for name in NUMERIC_FEATURES if name in kept]
+
+
+def selector_abs_coef(pipeline: Pipeline, feature: str) -> float:
+    if "select" not in pipeline.named_steps:
+        return 0.0
+    names = _prep_names(pipeline)
+    coefs = np.abs(np.ravel(pipeline.named_steps["select"].estimator_.coef_))
+    for name, coef in zip(names, coefs):
+        if name == feature:
+            return float(coef)
+    return 0.0
 
 
 def coefficient_table(pipeline: Pipeline) -> list[dict[str, Any]]:
@@ -211,10 +261,10 @@ def coefficient_table(pipeline: Pipeline) -> list[dict[str, Any]]:
     intercept = float(pipeline.named_steps["model"].intercept_)
     rows = [
         {
-            "feature": name.replace("num__", "").replace("cat__", ""),
+            "feature": _strip_encoder_prefix(name),
             "coefficient": _round(float(coef), 6),
             "abs_coefficient": _round(abs(float(coef)), 6),
-            "nonzero": bool(abs(float(coef)) > 1e-10),
+            "nonzero": bool(abs(float(coef)) > LASSO_COEF_THRESHOLD),
         }
         for name, coef in zip(names, coefs)
     ]
@@ -269,9 +319,11 @@ def train_and_evaluate(
 
     lasso_model = lasso.named_steps["model"]
     ridge_model = ridge.named_steps["model"]
-    encoded_names = feature_names(lasso)
+    encoded_names = _prep_names(lasso)
+    selection = lasso_selection(lasso)
     lasso_coefs = coefficient_table(lasso)
     n_nonzero = sum(1 for row in lasso_coefs if row["nonzero"] and row["feature"] != "(intercept)")
+    selector_alpha = float(lasso.named_steps["select"].estimator_.alpha_)
 
     y_in_sample_lasso = lasso.predict(X)
     y_in_sample_ridge = ridge.predict(X)
@@ -282,6 +334,9 @@ def train_and_evaluate(
         "n_raw_numeric": len(NUMERIC_FEATURES),
         "n_raw_categorical": len(CATEGORICAL_FEATURES),
         "n_encoded_features": len(encoded_names),
+        "n_selected_features": len(selection["kept"]),
+        "selected_features": selection["kept"],
+        "dropped_features": selection["dropped"],
         "target": TARGET,
         "feature_object": FEATURE_OBJECT,
         "target_summary": {
@@ -302,6 +357,8 @@ def train_and_evaluate(
             },
             "lasso": {
                 "alpha": _round(float(lasso_model.alpha_), 6),
+                "selector_alpha": _round(selector_alpha, 6),
+                "n_selected": len(selection["kept"]),
                 "n_nonzero": int(n_nonzero),
                 "loo": {k: _round(v, 4) for k, v in regression_metrics(y, pred_lasso).items()},
                 "in_sample": {k: _round(v, 4) for k, v in regression_metrics(y, y_in_sample_lasso).items()},
@@ -365,10 +422,27 @@ def save_artifacts(result: dict[str, Any], output_dir: Path) -> None:
 
 
 def load_tracks(path: Path) -> list[dict[str, Any]]:
-    payload = json.loads(path.read_text())
-    if not isinstance(payload, list):
-        raise ValueError(f"Expected a JSON array of tracks in {path}")
-    return payload
+    raw = path.read_text()
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        tracks: list[dict[str, Any]] = []
+        for line_no, line in enumerate(raw.splitlines(), 1):
+            line = line.strip()
+            if not line:
+                continue
+            obj = json.loads(line)
+            if not isinstance(obj, dict):
+                raise ValueError(f"JSONL line {line_no} in {path} is not an object")
+            tracks.append(obj)
+        if not tracks:
+            raise ValueError(f"No tracks found in {path}")
+        return tracks
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        return [payload]
+    raise ValueError(f"Expected a JSON array, object, or JSONL of tracks in {path}")
 
 
 def predict_tracks(tracks: list[dict[str, Any]], pipeline: Pipeline) -> list[dict[str, Any]]:
@@ -397,7 +471,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     train_p = sub.add_parser("train", help="Fit Lasso and Ridge and write artifacts.")
-    train_p.add_argument("--input", required=True, type=Path, help="ASP tracks JSON array.")
+    train_p.add_argument("--input", required=True, type=Path, help="ASP tracks JSON array or JSONL.")
     train_p.add_argument(
         "--output-dir",
         type=Path,
@@ -445,6 +519,8 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "n_tracks": result["report"]["n_tracks"],
                     "n_encoded_features": result["report"]["n_encoded_features"],
+                    "n_selected_features": result["report"]["n_selected_features"],
+                    "dropped_features": result["report"]["dropped_features"],
                     "lasso": models["lasso"],
                     "ridge": models["ridge"],
                     "ols": models["ols"],

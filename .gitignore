@@ -9,3 +9,6 @@ build/
 .env
 models/*.joblib
 models/metrics.json
+models/pysr/
+models/pysr*/
+outputs/

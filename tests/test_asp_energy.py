@@ -172,4 +172,35 @@ def test_cli_train_and_predict(tmp_path: Path):
 def test_lasso_pipeline_is_sklearn_pipeline():
     pipe = make_lasso()
     assert "prep" in pipe.named_steps
+    assert "select" in pipe.named_steps
     assert "model" in pipe.named_steps
+
+
+def test_lasso_drops_zero_coefficients():
+    tracks = make_tracks(40)
+    result = train_and_evaluate(
+        tracks,
+        outer_cv=KFold(n_splits=5, shuffle=True, random_state=42),
+    )
+    report = result["report"]
+    kept = report["selected_features"]
+    dropped = report["dropped_features"]
+    encoded = report["n_encoded_features"]
+    assert kept
+    assert len(kept) + len(dropped) == encoded
+    assert report["n_selected_features"] == len(kept)
+    assert report["n_selected_features"] < encoded
+    table_features = {
+        row["feature"] for row in report["lasso_coefficients"] if row["feature"] != "(intercept)"
+    }
+    assert table_features.isdisjoint(dropped)
+    assert any(name in table_features for name in ("happy", "relaxed"))
+
+
+def test_load_tracks_jsonl(tmp_path: Path):
+    tracks = make_tracks(3)
+    path = tmp_path / "tracks.jsonl"
+    path.write_text("\n".join(json.dumps(track) for track in tracks) + "\n")
+    loaded = load_tracks(path)
+    assert len(loaded) == 3
+    assert loaded[0]["_id"] == "track-000"

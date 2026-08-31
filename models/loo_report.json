@@ -1,0 +1,69 @@
+{
+  "source": "aspTracks_selection_100.json",
+  "feature_object": "aspAudioFeatures",
+  "target": "aspEnergy",
+  "n_tracks": 100,
+  "n_encoded_features": 41,
+  "evaluation": "leave-one-out (outer); 5-fold CV for alpha (inner)",
+  "target_summary": {
+    "min": 0.1869,
+    "max": 0.8781,
+    "mean": 0.6262,
+    "std": 0.1477
+  },
+  "models": {
+    "mean_baseline": {
+      "r2": 0.0,
+      "rmse": 0.1469,
+      "mae": 0.1158
+    },
+    "ols": {
+      "loo": { "r2": 0.9419, "rmse": 0.0354, "mae": 0.0272, "pearson_r": 0.9707 },
+      "in_sample": { "r2": 0.9788, "rmse": 0.0214, "mae": 0.0166 }
+    },
+    "lasso": {
+      "alpha": 0.000588,
+      "n_nonzero": 25,
+      "loo": { "r2": 0.9492, "rmse": 0.0331, "mae": 0.0248, "pearson_r": 0.9743 },
+      "in_sample": { "r2": 0.9741, "rmse": 0.0237, "mae": 0.0183 }
+    },
+    "ridge": {
+      "alpha": 1.0,
+      "loo": { "r2": 0.9446, "rmse": 0.0346, "mae": 0.0268, "pearson_r": 0.9719 },
+      "in_sample": { "r2": 0.9764, "rmse": 0.0226, "mae": 0.0173 }
+    }
+  },
+  "univariate_top": [
+    { "feature": "relaxed", "pearson_r": -0.7336 },
+    { "feature": "sad", "pearson_r": -0.6885 },
+    { "feature": "intensity", "pearson_r": 0.6272 },
+    { "feature": "happy", "pearson_r": 0.5578 },
+    { "feature": "party", "pearson_r": 0.4915 },
+    { "feature": "loudness", "pearson_r": 0.462 },
+    { "feature": "acoustic", "pearson_r": -0.459 },
+    { "feature": "energy", "pearson_r": 0.4249 }
+  ],
+  "lasso_top_coefficients": [
+    { "feature": "loudness", "coefficient": 0.0989 },
+    { "feature": "relaxed", "coefficient": -0.0649 },
+    { "feature": "onset_rate", "coefficient": 0.0367 },
+    { "feature": "intensity", "coefficient": 0.0292 },
+    { "feature": "acoustic", "coefficient": -0.0254 },
+    { "feature": "dynamic_range", "coefficient": -0.0232 },
+    { "feature": "happy", "coefficient": 0.0231 },
+    { "feature": "key_C", "coefficient": -0.0215 },
+    { "feature": "leq", "coefficient": -0.0189 },
+    { "feature": "sad", "coefficient": 0.0169 },
+    { "feature": "energy", "coefficient": -0.0168 },
+    { "feature": "durationMs", "coefficient": 0.0143 }
+  ],
+  "lasso_zeroed": [
+    "instrumental",
+    "larm",
+    "initialSilence",
+    "language_probability",
+    "scale",
+    "most keys except C/A/Ab/G"
+  ],
+  "note": "Fit on the 100-track ASP export. Predictors are only aspAudioFeatures fields; aspEnergy is the target. Coefficients are after StandardScaler. Retrain with: python -m asp_energy train --input path/to/aspTracks.json"
+}

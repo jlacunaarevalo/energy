@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "asp-energy"
+version = "1.0.0"
+description = "Predict aspEnergy from aspAudioFeatures with Lasso and Ridge."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "scikit-learn>=1.4",
+    "pandas>=2.0",
+    "joblib>=1.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[project.scripts]
+asp-energy = "asp_energy:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["asp_energy"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

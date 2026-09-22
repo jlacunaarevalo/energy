@@ -1,0 +1,221 @@
+{
+  "target": "aspEnergy",
+  "feature_object": "aspAudioFeatures",
+  "source": "lasso_pipeline.joblib",
+  "oos_benchmark": {
+    "n_tracks": 10,
+    "note": "10 out-of-sample tracks (BRUNO/DRAKE/ELLA/FKA/FONTAINES/HARRY/OLIVIA/TAYLOR/THE/TYLER)",
+    "lasso_pipeline": {
+      "r2": 0.926,
+      "mae": 0.03,
+      "rmse": 0.0369
+    },
+    "formula_full_21term": {
+      "r2": 0.9235,
+      "mae": 0.0316,
+      "rmse": 0.0375
+    },
+    "formula_12term": {
+      "r2": 0.9112,
+      "mae": 0.0297,
+      "rmse": 0.0404
+    },
+    "formula_pysr_4term": {
+      "r2": 0.1532,
+      "mae": 0.1095,
+      "rmse": 0.1248
+    },
+    "mean_baseline": {
+      "r2": 0.0,
+      "mae": 0.1036,
+      "rmse": 0.1356
+    }
+  },
+  "formulas": {
+    "full_21term": {
+      "label": "lasso_explicit_full",
+      "description": "Explicit linear formula in raw (unstandardized) feature space, extracted from trained Lasso pipeline.",
+      "constant": -0.15041377,
+      "terms": [
+        {
+          "feature": "relaxed",
+          "coefficient": -0.31681594
+        },
+        {
+          "feature": "happy",
+          "coefficient": 0.14436526
+        },
+        {
+          "feature": "aggressive",
+          "coefficient": 0.14164619
+        },
+        {
+          "feature": "acoustic",
+          "coefficient": -0.12532957
+        },
+        {
+          "feature": "party",
+          "coefficient": -0.11951181
+        },
+        {
+          "feature": "intensity",
+          "coefficient": 0.08425672
+        },
+        {
+          "feature": "sad",
+          "coefficient": 0.06593199
+        },
+        {
+          "feature": "onset_rate",
+          "coefficient": 0.06064728
+        },
+        {
+          "feature": "danceability",
+          "coefficient": 0.04530975
+        },
+        {
+          "feature": "entropy",
+          "coefficient": 0.03540056
+        },
+        {
+          "feature": "loudness",
+          "coefficient": 0.02020818
+        },
+        {
+          "feature": "dynamic_range",
+          "coefficient": -0.01148291
+        },
+        {
+          "feature": "leq",
+          "coefficient": -0.00896322
+        },
+        {
+          "feature": "language_probability",
+          "coefficient": 0.0053084
+        },
+        {
+          "feature": "gender",
+          "coefficient": -0.00442696
+        },
+        {
+          "feature": "larm",
+          "coefficient": 0.0025078
+        },
+        {
+          "feature": "tempo",
+          "coefficient": 9.723e-05
+        },
+        {
+          "feature": "initialSilence",
+          "coefficient": 1.03e-06
+        },
+        {
+          "feature": "finalSilence",
+          "coefficient": 2.2e-07
+        },
+        {
+          "feature": "durationMs",
+          "coefficient": -1.1e-07
+        },
+        {
+          "feature": "energy",
+          "coefficient": 3e-08
+        }
+      ],
+      "usage": "aspEnergy = constant + sum(coefficient_i * feature_i)",
+      "features_needed": [
+        "relaxed",
+        "happy",
+        "aggressive",
+        "acoustic",
+        "party",
+        "intensity",
+        "sad",
+        "onset_rate",
+        "danceability",
+        "entropy",
+        "loudness",
+        "dynamic_range",
+        "leq",
+        "language_probability",
+        "gender",
+        "larm",
+        "tempo",
+        "initialSilence",
+        "finalSilence",
+        "durationMs",
+        "energy"
+      ]
+    },
+    "12term": {
+      "label": "lasso_explicit_12term",
+      "description": "Explicit linear formula in raw (unstandardized) feature space, extracted from trained Lasso pipeline.",
+      "constant": -0.03131062,
+      "terms": [
+        {
+          "feature": "relaxed",
+          "coefficient": -0.31681594
+        },
+        {
+          "feature": "happy",
+          "coefficient": 0.14436526
+        },
+        {
+          "feature": "aggressive",
+          "coefficient": 0.14164619
+        },
+        {
+          "feature": "acoustic",
+          "coefficient": -0.12532957
+        },
+        {
+          "feature": "party",
+          "coefficient": -0.11951181
+        },
+        {
+          "feature": "intensity",
+          "coefficient": 0.08425672
+        },
+        {
+          "feature": "sad",
+          "coefficient": 0.06593199
+        },
+        {
+          "feature": "onset_rate",
+          "coefficient": 0.06064728
+        },
+        {
+          "feature": "danceability",
+          "coefficient": 0.04530975
+        },
+        {
+          "feature": "entropy",
+          "coefficient": 0.03540056
+        },
+        {
+          "feature": "loudness",
+          "coefficient": 0.02020818
+        },
+        {
+          "feature": "dynamic_range",
+          "coefficient": -0.01148291
+        }
+      ],
+      "usage": "aspEnergy = constant + sum(coefficient_i * feature_i)",
+      "features_needed": [
+        "relaxed",
+        "happy",
+        "aggressive",
+        "acoustic",
+        "party",
+        "intensity",
+        "sad",
+        "onset_rate",
+        "danceability",
+        "entropy",
+        "loudness",
+        "dynamic_range"
+      ]
+    }
+  }
+}

@@ -1,0 +1,448 @@
+{
+  "model": "polynomial_lasso_degree2_mi12",
+  "description": "Degree-2 polynomial Lasso on top-12 MI features.",
+  "target": "aspEnergy",
+  "feature_object": "aspAudioFeatures",
+  "features": [
+    "relaxed",
+    "party",
+    "sad",
+    "happy",
+    "loudness",
+    "aggressive",
+    "larm",
+    "onset_rate",
+    "energy",
+    "danceability",
+    "leq",
+    "intensity"
+  ],
+  "constant": 0.67362026,
+  "n_terms": 75,
+  "terms": [
+    {
+      "poly_feature": "relaxed",
+      "raw_coef": -0.67286683
+    },
+    {
+      "poly_feature": "aggressive",
+      "raw_coef": 0.44087716
+    },
+    {
+      "poly_feature": "sad aggressive",
+      "raw_coef": -0.4002009
+    },
+    {
+      "poly_feature": "party sad",
+      "raw_coef": -0.370119
+    },
+    {
+      "poly_feature": "relaxed sad",
+      "raw_coef": -0.35342601
+    },
+    {
+      "poly_feature": "aggressive^2",
+      "raw_coef": -0.34117526
+    },
+    {
+      "poly_feature": "party",
+      "raw_coef": 0.30235849
+    },
+    {
+      "poly_feature": "sad",
+      "raw_coef": 0.27922973
+    },
+    {
+      "poly_feature": "sad happy",
+      "raw_coef": 0.22942674
+    },
+    {
+      "poly_feature": "party aggressive",
+      "raw_coef": -0.19704238
+    },
+    {
+      "poly_feature": "relaxed^2",
+      "raw_coef": 0.18524001
+    },
+    {
+      "poly_feature": "happy aggressive",
+      "raw_coef": 0.15419406
+    },
+    {
+      "poly_feature": "relaxed party",
+      "raw_coef": 0.14696973
+    },
+    {
+      "poly_feature": "relaxed danceability",
+      "raw_coef": 0.1420247
+    },
+    {
+      "poly_feature": "danceability",
+      "raw_coef": -0.14182287
+    },
+    {
+      "poly_feature": "party happy",
+      "raw_coef": -0.09444223
+    },
+    {
+      "poly_feature": "party onset_rate",
+      "raw_coef": -0.08554922
+    },
+    {
+      "poly_feature": "aggressive danceability",
+      "raw_coef": 0.08089154
+    },
+    {
+      "poly_feature": "relaxed intensity",
+      "raw_coef": -0.06871374
+    },
+    {
+      "poly_feature": "party intensity",
+      "raw_coef": -0.0627063
+    },
+    {
+      "poly_feature": "intensity",
+      "raw_coef": 0.05580477
+    },
+    {
+      "poly_feature": "happy^2",
+      "raw_coef": -0.0455069
+    },
+    {
+      "poly_feature": "sad danceability",
+      "raw_coef": 0.03821817
+    },
+    {
+      "poly_feature": "happy onset_rate",
+      "raw_coef": 0.03667459
+    },
+    {
+      "poly_feature": "intensity^2",
+      "raw_coef": -0.02998485
+    },
+    {
+      "poly_feature": "onset_rate danceability",
+      "raw_coef": 0.02906075
+    },
+    {
+      "poly_feature": "aggressive intensity",
+      "raw_coef": 0.02748756
+    },
+    {
+      "poly_feature": "danceability intensity",
+      "raw_coef": 0.02736906
+    },
+    {
+      "poly_feature": "relaxed onset_rate",
+      "raw_coef": 0.02618733
+    },
+    {
+      "poly_feature": "sad intensity",
+      "raw_coef": 0.02545612
+    },
+    {
+      "poly_feature": "party^2",
+      "raw_coef": 0.02389074
+    },
+    {
+      "poly_feature": "party leq",
+      "raw_coef": -0.0194462
+    },
+    {
+      "poly_feature": "relaxed aggressive",
+      "raw_coef": -0.01871843
+    },
+    {
+      "poly_feature": "relaxed happy",
+      "raw_coef": -0.01748957
+    },
+    {
+      "poly_feature": "happy danceability",
+      "raw_coef": 0.01621479
+    },
+    {
+      "poly_feature": "party loudness",
+      "raw_coef": 0.01606387
+    },
+    {
+      "poly_feature": "loudness danceability",
+      "raw_coef": 0.01344561
+    },
+    {
+      "poly_feature": "happy intensity",
+      "raw_coef": -0.01324063
+    },
+    {
+      "poly_feature": "aggressive onset_rate",
+      "raw_coef": 0.01263284
+    },
+    {
+      "poly_feature": "aggressive larm",
+      "raw_coef": 0.01213163
+    },
+    {
+      "poly_feature": "sad onset_rate",
+      "raw_coef": -0.01210271
+    },
+    {
+      "poly_feature": "loudness",
+      "raw_coef": 0.01134064
+    },
+    {
+      "poly_feature": "onset_rate",
+      "raw_coef": 0.0105141
+    },
+    {
+      "poly_feature": "party larm",
+      "raw_coef": -0.01048576
+    },
+    {
+      "poly_feature": "loudness intensity",
+      "raw_coef": 0.00945852
+    },
+    {
+      "poly_feature": "leq intensity",
+      "raw_coef": -0.00885392
+    },
+    {
+      "poly_feature": "danceability leq",
+      "raw_coef": -0.0070677
+    },
+    {
+      "poly_feature": "sad loudness",
+      "raw_coef": -0.00700964
+    },
+    {
+      "poly_feature": "loudness aggressive",
+      "raw_coef": -0.00668895
+    },
+    {
+      "poly_feature": "onset_rate^2",
+      "raw_coef": 0.00632185
+    },
+    {
+      "poly_feature": "happy loudness",
+      "raw_coef": 0.00503532
+    },
+    {
+      "poly_feature": "party danceability",
+      "raw_coef": -0.0048616
+    },
+    {
+      "poly_feature": "larm danceability",
+      "raw_coef": -0.00421913
+    },
+    {
+      "poly_feature": "happy larm",
+      "raw_coef": 0.00363378
+    },
+    {
+      "poly_feature": "onset_rate intensity",
+      "raw_coef": 0.00304463
+    },
+    {
+      "poly_feature": "larm onset_rate",
+      "raw_coef": 0.00161671
+    },
+    {
+      "poly_feature": "relaxed leq",
+      "raw_coef": 0.00080124
+    },
+    {
+      "poly_feature": "sad leq",
+      "raw_coef": -0.00039581
+    },
+    {
+      "poly_feature": "larm",
+      "raw_coef": 0.00037057
+    },
+    {
+      "poly_feature": "loudness^2",
+      "raw_coef": 0.00010611
+    },
+    {
+      "poly_feature": "onset_rate leq",
+      "raw_coef": -2.304e-05
+    },
+    {
+      "poly_feature": "leq^2",
+      "raw_coef": -2.8e-07
+    },
+    {
+      "poly_feature": "sad energy",
+      "raw_coef": 1e-07
+    },
+    {
+      "poly_feature": "relaxed energy",
+      "raw_coef": 8e-08
+    },
+    {
+      "poly_feature": "energy danceability",
+      "raw_coef": -7e-08
+    },
+    {
+      "poly_feature": "party energy",
+      "raw_coef": 6e-08
+    },
+    {
+      "poly_feature": "happy energy",
+      "raw_coef": -6e-08
+    },
+    {
+      "poly_feature": "aggressive energy",
+      "raw_coef": -4e-08
+    },
+    {
+      "poly_feature": "energy",
+      "raw_coef": -2e-08
+    },
+    {
+      "poly_feature": "loudness energy",
+      "raw_coef": 2e-08
+    },
+    {
+      "poly_feature": "energy leq",
+      "raw_coef": -2e-08
+    },
+    {
+      "poly_feature": "energy intensity",
+      "raw_coef": 2e-08
+    },
+    {
+      "poly_feature": "larm energy",
+      "raw_coef": 0.0
+    },
+    {
+      "poly_feature": "onset_rate energy",
+      "raw_coef": 0.0
+    },
+    {
+      "poly_feature": "energy^2",
+      "raw_coef": -0.0
+    }
+  ],
+  "usage": "aspEnergy = constant + sum(raw_coef * poly_feature_value). Poly feature names: \"feat\" = linear, \"feat^2\" = squared, \"feat1 feat2\" = product.",
+  "benchmark": {
+    "held_out_test_27k": {
+      "r2": 0.9859,
+      "mae": 0.0205,
+      "rmse": 0.0275
+    },
+    "oos_10_tracks": {
+      "r2": 0.9761,
+      "mae": 0.0185
+    }
+  },
+  "comparison_oos_10tracks": {
+    "poly12_lasso": {
+      "r2": 0.9761,
+      "mae": 0.0185
+    },
+    "lasso_pipeline": {
+      "r2": 0.926,
+      "mae": 0.03
+    },
+    "old_pysr_4term": {
+      "r2": 0.1532,
+      "mae": 0.1095
+    },
+    "baseline_mean": {
+      "r2": 0.0,
+      "mae": 0.1036
+    }
+  },
+  "mi_rankings": [
+    {
+      "feature": "relaxed",
+      "mi": 0.841
+    },
+    {
+      "feature": "party",
+      "mi": 0.6001
+    },
+    {
+      "feature": "sad",
+      "mi": 0.4997
+    },
+    {
+      "feature": "happy",
+      "mi": 0.493
+    },
+    {
+      "feature": "loudness",
+      "mi": 0.4131
+    },
+    {
+      "feature": "aggressive",
+      "mi": 0.4094
+    },
+    {
+      "feature": "larm",
+      "mi": 0.3847
+    },
+    {
+      "feature": "onset_rate",
+      "mi": 0.3635
+    },
+    {
+      "feature": "energy",
+      "mi": 0.3632
+    },
+    {
+      "feature": "danceability",
+      "mi": 0.3593
+    },
+    {
+      "feature": "leq",
+      "mi": 0.3553
+    },
+    {
+      "feature": "intensity",
+      "mi": 0.3508
+    },
+    {
+      "feature": "acoustic",
+      "mi": 0.3222
+    },
+    {
+      "feature": "dynamic_range",
+      "mi": 0.2303
+    },
+    {
+      "feature": "voice",
+      "mi": 0.2271
+    },
+    {
+      "feature": "instrumental",
+      "mi": 0.2221
+    },
+    {
+      "feature": "gender",
+      "mi": 0.1351
+    },
+    {
+      "feature": "tempo",
+      "mi": 0.117
+    },
+    {
+      "feature": "entropy",
+      "mi": 0.0977
+    },
+    {
+      "feature": "language_probability",
+      "mi": 0.0875
+    },
+    {
+      "feature": "durationMs",
+      "mi": 0.0816
+    },
+    {
+      "feature": "initialSilence",
+      "mi": 0.0795
+    },
+    {
+      "feature": "finalSilence",
+      "mi": 0.0724
+    }
+  ]
+}

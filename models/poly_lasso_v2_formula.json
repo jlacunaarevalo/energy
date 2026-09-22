@@ -1,0 +1,222 @@
+{
+  "description": "aspEnergy = intercept + sum of terms. Features: 20 numeric aspAudioFeatures. Degree-2 polynomial + Lasso. 5-fold CV R\u00b2=0.9525 MAE=0.039. OOS-18 R\u00b2=0.9564 MAE=0.025.",
+  "features_used": [
+    "danceability",
+    "acoustic",
+    "aggressive",
+    "happy",
+    "party",
+    "relaxed",
+    "sad",
+    "gender",
+    "voice",
+    "instrumental",
+    "electronic",
+    "approachability",
+    "engagement",
+    "bpm",
+    "loudness",
+    "intensity",
+    "audioAvgMainPitch",
+    "audioMaxMainPitch",
+    "audioMedianPitch",
+    "audioStdMainPitch"
+  ],
+  "intercept": 1.01441355,
+  "n_terms": 48,
+  "alpha": 0.00020683847273574583,
+  "terms": [
+    {
+      "feature": "happy sad",
+      "coefficient": 0.36667498
+    },
+    {
+      "feature": "aggressive relaxed",
+      "coefficient": -0.35906413
+    },
+    {
+      "feature": "relaxed",
+      "coefficient": -0.29148442
+    },
+    {
+      "feature": "danceability relaxed",
+      "coefficient": 0.28448111
+    },
+    {
+      "feature": "party sad",
+      "coefficient": -0.27048309
+    },
+    {
+      "feature": "aggressive happy",
+      "coefficient": 0.20428693
+    },
+    {
+      "feature": "relaxed voice",
+      "coefficient": -0.15930443
+    },
+    {
+      "feature": "aggressive instrumental",
+      "coefficient": 0.13902395
+    },
+    {
+      "feature": "relaxed^2",
+      "coefficient": -0.13520656
+    },
+    {
+      "feature": "sad instrumental",
+      "coefficient": -0.12920155
+    },
+    {
+      "feature": "danceability sad",
+      "coefficient": -0.12881501
+    },
+    {
+      "feature": "aggressive^2",
+      "coefficient": -0.11406047
+    },
+    {
+      "feature": "aggressive party",
+      "coefficient": 0.09517499
+    },
+    {
+      "feature": "intensity",
+      "coefficient": 0.08530212
+    },
+    {
+      "feature": "aggressive gender",
+      "coefficient": 0.08330346
+    },
+    {
+      "feature": "happy gender",
+      "coefficient": 0.07930306
+    },
+    {
+      "feature": "party gender",
+      "coefficient": -0.07239094
+    },
+    {
+      "feature": "happy instrumental",
+      "coefficient": 0.06691326
+    },
+    {
+      "feature": "happy",
+      "coefficient": 0.05572221
+    },
+    {
+      "feature": "gender^2",
+      "coefficient": -0.05132218
+    },
+    {
+      "feature": "happy relaxed",
+      "coefficient": 0.04645305
+    },
+    {
+      "feature": "acoustic happy",
+      "coefficient": -0.04090992
+    },
+    {
+      "feature": "party^2",
+      "coefficient": -0.04021063
+    },
+    {
+      "feature": "aggressive sad",
+      "coefficient": -0.03142782
+    },
+    {
+      "feature": "happy intensity",
+      "coefficient": -0.03138345
+    },
+    {
+      "feature": "acoustic intensity",
+      "coefficient": -0.02906051
+    },
+    {
+      "feature": "happy^2",
+      "coefficient": -0.02525479
+    },
+    {
+      "feature": "aggressive intensity",
+      "coefficient": 0.02362086
+    },
+    {
+      "feature": "loudness",
+      "coefficient": 0.02184807
+    },
+    {
+      "feature": "intensity^2",
+      "coefficient": -0.02092472
+    },
+    {
+      "feature": "acoustic party",
+      "coefficient": 0.01389877
+    },
+    {
+      "feature": "voice instrumental",
+      "coefficient": 0.0125291
+    },
+    {
+      "feature": "party loudness",
+      "coefficient": -0.01058693
+    },
+    {
+      "feature": "happy loudness",
+      "coefficient": 0.01038403
+    },
+    {
+      "feature": "acoustic^2",
+      "coefficient": 0.01000965
+    },
+    {
+      "feature": "acoustic gender",
+      "coefficient": -0.00861195
+    },
+    {
+      "feature": "voice intensity",
+      "coefficient": 0.00698143
+    },
+    {
+      "feature": "party relaxed",
+      "coefficient": 0.00696323
+    },
+    {
+      "feature": "danceability^2",
+      "coefficient": -0.0020548
+    },
+    {
+      "feature": "sad intensity",
+      "coefficient": 0.00100183
+    },
+    {
+      "feature": "danceability aggressive",
+      "coefficient": 0.00092154
+    },
+    {
+      "feature": "danceability loudness",
+      "coefficient": 0.00069303
+    },
+    {
+      "feature": "loudness intensity",
+      "coefficient": 0.00035178
+    },
+    {
+      "feature": "gender loudness",
+      "coefficient": -0.00023897
+    },
+    {
+      "feature": "loudness^2",
+      "coefficient": 0.0002125
+    },
+    {
+      "feature": "instrumental loudness",
+      "coefficient": 0.0001943
+    },
+    {
+      "feature": "relaxed loudness",
+      "coefficient": 0.00018818
+    },
+    {
+      "feature": "acoustic loudness",
+      "coefficient": 0.00013347
+    }
+  ]
+}

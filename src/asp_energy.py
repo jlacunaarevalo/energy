@@ -670,19 +670,27 @@ def compare_formula_models(
 
 
 def slim_tracks(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Keep only ids + aspAudioFeatures (rounded) so the file can be committed without LFS."""
     slim: list[dict[str, Any]] = []
     for track in tracks:
         asp = track.get(FEATURE_OBJECT)
         if not isinstance(asp, dict):
             continue
-        slim.append(
-            {
-                "_id": track.get("_id"),
-                "name": track.get("name"),
-                "artists": track.get("artists"),
-                FEATURE_OBJECT: asp,
-            }
-        )
+        compact_asp: dict[str, Any] = {}
+        for key, value in asp.items():
+            if isinstance(value, float):
+                compact_asp[key] = round(value, 6)
+            elif key == "language" and isinstance(value, dict):
+                lang = {
+                    "language": value.get("language") or value.get("code"),
+                    "probability": value.get("probability") or value.get("language_probability"),
+                }
+                if isinstance(lang["probability"], float):
+                    lang["probability"] = round(lang["probability"], 6)
+                compact_asp[key] = lang
+            else:
+                compact_asp[key] = value
+        slim.append({"_id": track.get("_id"), FEATURE_OBJECT: compact_asp})
     return slim
 
 
@@ -806,7 +814,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.slim_out is not None:
             slim_path: Path = args.slim_out
             slim_path.parent.mkdir(parents=True, exist_ok=True)
-            slim_path.write_text(json.dumps(slim_tracks(tracks), indent=2) + "\n")
+            slim_path.write_text(
+                json.dumps(slim_tracks(tracks), separators=(",", ":"), ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
         models = result["report"]["models"]
         print(
             json.dumps(

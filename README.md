@@ -5,9 +5,14 @@ There is one energy score: **aspEnergy**. This repo keeps two ways to copy it fr
 - **Lasso** — the sklearn model
 - **Closed-form formula** — the single PySR equation distilled from Lasso, for reading and serving
 
+## Data
+
+- **Full Aquisuena Peru catalog:** `aquisuenaperu.aspTracks.json.gz` (Git LFS). Decompress with `gzip -dk aquisuenaperu.aspTracks.json.gz` before training.
+- **Ten post-training songs:** `results_outside/*.json` (Bruno, Drake, Ella, FKA, Fontaines, Harry, Olivia, Taylor, The Cure, Tyler). These were never used to fit the formulas; they are a later check.
+
 ## Test set
 
-There is no committed test-track file in this repo. How numbers were (and now are) measured:
+How numbers were (and now are) measured:
 
 | Artifact | What was scored | Honest? |
 |---|---|---|

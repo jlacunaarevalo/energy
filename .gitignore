@@ -8,6 +8,7 @@ build/
 .ipynb_checkpoints/
 .env
 models/*.joblib
+!models/lasso_pipeline.joblib
 models/metrics.json
 models/formula_compare.json
 models/pysr/

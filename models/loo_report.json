@@ -4,7 +4,13 @@
   "target": "aspEnergy",
   "n_tracks": 100,
   "n_encoded_features": 41,
-  "evaluation": "leave-one-out (outer); 5-fold CV for alpha (inner)",
+  "evaluation": "leave-one-out on all 100 tracks (not a separate test file); 5-fold CV for alpha on the other 99",
+  "test_set": {
+    "kind": "leave-one-out",
+    "n": 100,
+    "source": "aspTracks_selection_100.json",
+    "note": "There is no held-out test file for this snapshot. Each track is predicted by a Lasso trained on the other 99."
+  },
   "target_summary": {
     "min": 0.1869,
     "max": 0.8781,
@@ -13,24 +19,16 @@
   },
   "models": {
     "mean_baseline": {
+      "note": "constant mean of the other 99 tracks; R² is 0 by construction on the full set",
       "r2": 0.0,
       "rmse": 0.1469,
       "mae": 0.1158
-    },
-    "ols": {
-      "loo": { "r2": 0.9419, "rmse": 0.0354, "mae": 0.0272, "pearson_r": 0.9707 },
-      "in_sample": { "r2": 0.9788, "rmse": 0.0214, "mae": 0.0166 }
     },
     "lasso": {
       "alpha": 0.000588,
       "n_nonzero": 25,
       "loo": { "r2": 0.9492, "rmse": 0.0331, "mae": 0.0248, "pearson_r": 0.9743 },
       "in_sample": { "r2": 0.9741, "rmse": 0.0237, "mae": 0.0183 }
-    },
-    "ridge": {
-      "alpha": 1.0,
-      "loo": { "r2": 0.9446, "rmse": 0.0346, "mae": 0.0268, "pearson_r": 0.9719 },
-      "in_sample": { "r2": 0.9764, "rmse": 0.0226, "mae": 0.0173 }
     }
   },
   "univariate_top": [
@@ -65,5 +63,5 @@
     "scale",
     "most keys except C/A/Ab/G"
   ],
-  "note": "Fit on the 100-track ASP export. Predictors are only aspAudioFeatures fields; aspEnergy is the target. Coefficients are after StandardScaler. Retrain with: python -m asp_energy train --input path/to/aspTracks.json"
+  "note": "Fit on the 100-track ASP export. Predictors are only aspAudioFeatures fields; aspEnergy is the target. Coefficients are after StandardScaler. New runs use a held-out split: python -m asp_energy train --input path/to/aspTracks.json"
 }

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "asp-energy"
 version = "1.0.0"
-description = "Predict aspEnergy from aspAudioFeatures with Lasso, Ridge, and a PySR formula."
+description = "Predict aspEnergy from aspAudioFeatures with Lasso and a PySR formula."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

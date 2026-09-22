@@ -1,12 +1,15 @@
-"""Predict ``aspEnergy`` from ``aspAudioFeatures`` only, with Lasso and Ridge.
+"""Predict ``aspEnergy`` from ``aspAudioFeatures`` with Lasso.
 
 Spotify ``audioFeatures``, ``experimentalAudioFeatures``, popularity, lyrics,
 and other track metadata are ignored. Categorical fields inside
 ``aspAudioFeatures`` (``key``, ``scale``, language code) are one-hot encoded;
 the nested language-probability blob is reduced to the detected code plus its
-confidence. Features are standardized before the penalty so L1/L2 are not
+confidence. Features are standardized before the penalty so L1 is not
 dominated by ``energy`` / ``durationMs`` scale. Lasso drops near-zero weights
 via ``SelectFromModel`` and refits on the surviving columns.
+
+Headline metrics are a held-out test split (default 20%). Lasso's penalty is
+chosen with 5-fold CV on the training tracks only.
 """
 
 from __future__ import annotations
@@ -20,14 +23,13 @@ from typing import Any
 import joblib
 import numpy as np
 import pandas as pd
-from sklearn.base import BaseEstimator
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_selection import SelectFromModel
-from sklearn.linear_model import LassoCV, LinearRegression, RidgeCV
+from sklearn.linear_model import ElasticNetCV, LassoCV, LinearRegression, RidgeCV
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import BaseCrossValidator, KFold, LeaveOneOut, cross_val_predict
+from sklearn.model_selection import KFold, train_test_split
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder, SplineTransformer, StandardScaler
 
 NUMERIC_FEATURES: tuple[str, ...] = (
     "danceability",
@@ -61,8 +63,23 @@ FEATURE_OBJECT = "aspAudioFeatures"
 
 LASSO_ALPHAS = np.logspace(-4, 1, 40)
 RIDGE_ALPHAS = np.logspace(-2, 4, 40)
+ELASTIC_L1_RATIOS = (0.2, 0.5, 0.8, 0.95)
 LASSO_COEF_THRESHOLD = 1e-10
 RANDOM_STATE = 42
+DEFAULT_TEST_FRAC = 0.2
+COMPACT_FEATURES: tuple[str, ...] = (
+    "relaxed",
+    "loudness",
+    "intensity",
+    "onset_rate",
+    "dynamic_range",
+    "happy",
+    "acoustic",
+)
+PYSR_FROZEN = (
+    "0.687504 - 0.436873*relaxed + 0.044354*onset_rate "
+    "+ 0.063815*intensity - 0.019298*dynamic_range"
+)
 
 
 def _inner_cv() -> KFold:
@@ -72,6 +89,10 @@ def _inner_cv() -> KFold:
 def extract_feature_row(asp: dict[str, Any]) -> dict[str, Any]:
     """Flatten one ``aspAudioFeatures`` object into a model row (no target)."""
     language = asp.get("language") or {}
+    if isinstance(language, str):
+        language = {"language": language, "probability": 0.0}
+    if not isinstance(language, dict):
+        language = {}
     row: dict[str, Any] = {
         name: asp.get(name) for name in NUMERIC_FEATURES if name != "language_probability"
     }
@@ -170,12 +191,89 @@ def make_ridge() -> Pipeline:
     )
 
 
+def make_elastic_net() -> Pipeline:
+    return Pipeline(
+        [
+            ("prep", make_preprocessor()),
+            (
+                "model",
+                ElasticNetCV(
+                    alphas=LASSO_ALPHAS,
+                    l1_ratio=list(ELASTIC_L1_RATIOS),
+                    cv=_inner_cv(),
+                    max_iter=50_000,
+                    random_state=RANDOM_STATE,
+                    n_jobs=-1,
+                ),
+            ),
+        ]
+    )
+
+
 def make_ols() -> Pipeline:
     return Pipeline(
         [
             ("prep", make_preprocessor()),
             ("model", LinearRegression()),
         ]
+    )
+
+
+def make_compact_ols() -> Pipeline:
+    """Short linear formula on the features that keep a readable equation."""
+    return Pipeline(
+        [
+            ("prep", StandardScaler()),
+            ("model", LinearRegression()),
+        ]
+    )
+
+
+def make_compact_splines() -> Pipeline:
+    """Additive spline formula on the compact feature set (still closed form)."""
+    return Pipeline(
+        [
+            (
+                "prep",
+                SplineTransformer(n_knots=6, degree=3, include_bias=False),
+            ),
+            ("model", RidgeCV(alphas=RIDGE_ALPHAS, cv=_inner_cv())),
+        ]
+    )
+
+
+def split_labeled(
+    X: pd.DataFrame,
+    y: np.ndarray,
+    labels: list[str],
+    *,
+    test_frac: float = DEFAULT_TEST_FRAC,
+    random_state: int = RANDOM_STATE,
+) -> tuple[pd.DataFrame, np.ndarray, list[str], pd.DataFrame, np.ndarray, list[str]]:
+    """Hold out ``test_frac`` of labeled rows. Training and test never overlap."""
+    if test_frac <= 0:
+        y_arr = np.asarray(y, dtype=float)
+        return X, y_arr, list(labels), X, y_arr, list(labels)
+    if test_frac >= 1:
+        raise ValueError("test_frac must be in [0, 1)")
+    n = len(y)
+    min_n = 8
+    if n < min_n:
+        raise ValueError(f"Need at least {min_n} labeled tracks to hold out a test set, got {n}")
+    X_train, X_test, y_train, y_test, lab_train, lab_test = train_test_split(
+        X,
+        np.asarray(y, dtype=float),
+        np.asarray(labels, dtype=object),
+        test_size=test_frac,
+        random_state=random_state,
+    )
+    return (
+        X_train.reset_index(drop=True),
+        np.asarray(y_train, dtype=float),
+        lab_train.tolist(),
+        X_test.reset_index(drop=True),
+        np.asarray(y_test, dtype=float),
+        lab_test.tolist(),
     )
 
 
@@ -192,16 +290,16 @@ def regression_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, floa
         "rmse": float(rmse),
         "mae": float(mean_absolute_error(y_true, y_pred)),
         "pearson_r": _pearson(y_true, y_pred),
+        "spearman_r": _spearman(y_true, y_pred),
     }
 
 
-def _loo_predict(
-    estimator: BaseEstimator,
-    X: pd.DataFrame,
-    y: np.ndarray,
-    cv: BaseCrossValidator,
-) -> np.ndarray:
-    return cross_val_predict(estimator, X, y, cv=cv, n_jobs=-1)
+def _spearman(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    if np.std(y_pred) < 1e-12 or np.std(y_true) < 1e-12:
+        return float("nan")
+    true_rank = pd.Series(y_true).rank().to_numpy(dtype=float)
+    pred_rank = pd.Series(y_pred).rank().to_numpy(dtype=float)
+    return _pearson(true_rank, pred_rank)
 
 
 def _round(value: float | None, digits: int = 6) -> float | None:
@@ -299,38 +397,52 @@ def univariate_correlations(X: pd.DataFrame, y: np.ndarray) -> list[dict[str, An
 def train_and_evaluate(
     tracks: list[dict[str, Any]],
     *,
-    outer_cv: BaseCrossValidator | None = None,
+    test_frac: float = DEFAULT_TEST_FRAC,
+    test_tracks: list[dict[str, Any]] | None = None,
+    random_state: int = RANDOM_STATE,
 ) -> dict[str, Any]:
     X, y, labels = tracks_to_frame(tracks)
     assert y is not None
-    cv = outer_cv if outer_cv is not None else LeaveOneOut()
+    if test_tracks is not None:
+        X_train, y_train, labels_train = X, y, labels
+        X_test, y_test, labels_test = tracks_to_frame(test_tracks)
+        assert y_test is not None
+        evaluation = (
+            f"held-out test file ({len(y_test)} tracks); "
+            "5-fold CV for Lasso alpha on train only"
+        )
+    else:
+        X_train, y_train, labels_train, X_test, y_test, labels_test = split_labeled(
+            X, y, labels, test_frac=test_frac, random_state=random_state
+        )
+        if test_frac <= 0:
+            evaluation = "in-sample (no held-out test set); 5-fold CV for Lasso alpha"
+        else:
+            evaluation = (
+                f"held-out test ({test_frac:.0%} of {len(y)} labeled tracks, "
+                f"seed {random_state}); 5-fold CV for Lasso alpha on train only"
+            )
+
     lasso = make_lasso()
-    ridge = make_ridge()
-    ols = make_ols()
+    lasso.fit(X_train, y_train)
 
-    pred_mean = np.full_like(y, fill_value=float(y.mean()))
-    pred_ols = _loo_predict(ols, X, y, cv)
-    pred_lasso = _loo_predict(lasso, X, y, cv)
-    pred_ridge = _loo_predict(ridge, X, y, cv)
-
-    lasso.fit(X, y)
-    ridge.fit(X, y)
-    ols.fit(X, y)
+    pred_test = lasso.predict(X_test)
+    pred_train = lasso.predict(X_train)
+    mean_train = float(y_train.mean())
+    pred_mean = np.full_like(y_test, fill_value=mean_train)
 
     lasso_model = lasso.named_steps["model"]
-    ridge_model = ridge.named_steps["model"]
     encoded_names = _prep_names(lasso)
     selection = lasso_selection(lasso)
     lasso_coefs = coefficient_table(lasso)
     n_nonzero = sum(1 for row in lasso_coefs if row["nonzero"] and row["feature"] != "(intercept)")
     selector_alpha = float(lasso.named_steps["select"].estimator_.alpha_)
 
-    y_in_sample_lasso = lasso.predict(X)
-    y_in_sample_ridge = ridge.predict(X)
-    cv_name = type(cv).__name__
-
     report = {
-        "n_tracks": int(len(y)),
+        "n_tracks": int(len(y_train) if test_tracks is None and test_frac <= 0 else len(y_train) + len(y_test)),
+        "n_train": int(len(y_train)),
+        "n_test": int(len(y_test)),
+        "test_frac": None if test_tracks is not None or test_frac <= 0 else test_frac,
         "n_raw_numeric": len(NUMERIC_FEATURES),
         "n_raw_categorical": len(CATEGORICAL_FEATURES),
         "n_encoded_features": len(encoded_names),
@@ -340,60 +452,220 @@ def train_and_evaluate(
         "target": TARGET,
         "feature_object": FEATURE_OBJECT,
         "target_summary": {
-            "min": _round(float(y.min()), 4),
-            "max": _round(float(y.max()), 4),
-            "mean": _round(float(y.mean()), 4),
-            "std": _round(float(y.std(ddof=1)), 4),
+            "min": _round(float(y_train.min()), 4),
+            "max": _round(float(y_train.max()), 4),
+            "mean": _round(mean_train, 4),
+            "std": _round(float(y_train.std(ddof=1)), 4),
         },
-        "evaluation": f"{cv_name} (outer); 5-fold CV for alpha (inner)",
+        "evaluation": evaluation,
         "models": {
             "mean_baseline": {
-                "note": "constant training-set mean; R² is 0 by construction",
-                "loo": {k: _round(v, 4) for k, v in regression_metrics(y, pred_mean).items()},
-            },
-            "ols": {
-                "loo": {k: _round(v, 4) for k, v in regression_metrics(y, pred_ols).items()},
-                "in_sample": {k: _round(v, 4) for k, v in regression_metrics(y, ols.predict(X)).items()},
+                "note": "predict the training-set mean on the test tracks",
+                "test": {k: _round(v, 4) for k, v in regression_metrics(y_test, pred_mean).items()},
             },
             "lasso": {
                 "alpha": _round(float(lasso_model.alpha_), 6),
                 "selector_alpha": _round(selector_alpha, 6),
                 "n_selected": len(selection["kept"]),
                 "n_nonzero": int(n_nonzero),
-                "loo": {k: _round(v, 4) for k, v in regression_metrics(y, pred_lasso).items()},
-                "in_sample": {k: _round(v, 4) for k, v in regression_metrics(y, y_in_sample_lasso).items()},
-            },
-            "ridge": {
-                "alpha": _round(float(ridge_model.alpha_), 6),
-                "loo": {k: _round(v, 4) for k, v in regression_metrics(y, pred_ridge).items()},
-                "in_sample": {k: _round(v, 4) for k, v in regression_metrics(y, y_in_sample_ridge).items()},
+                "test": {k: _round(v, 4) for k, v in regression_metrics(y_test, pred_test).items()},
+                "train": {k: _round(v, 4) for k, v in regression_metrics(y_train, pred_train).items()},
             },
         },
-        "univariate_correlations": univariate_correlations(X, y),
+        "univariate_correlations": univariate_correlations(X_train, y_train),
         "lasso_coefficients": lasso_coefs,
-        "ridge_coefficients": coefficient_table(ridge),
         "predictions": [
             {
                 "track": label,
+                "split": "test",
                 "actual": _round(float(actual), 4),
-                "lasso": _round(float(p_lasso), 4),
-                "ridge": _round(float(p_ridge), 4),
-                "ols": _round(float(p_ols), 4),
-                "lasso_error": _round(float(p_lasso - actual), 4),
-                "ridge_error": _round(float(p_ridge - actual), 4),
+                "lasso": _round(float(hat), 4),
+                "lasso_error": _round(float(hat - actual), 4),
             }
-            for label, actual, p_lasso, p_ridge, p_ols in zip(
-                labels, y, pred_lasso, pred_ridge, pred_ols
-            )
+            for label, actual, hat in zip(labels_test, y_test, pred_test)
         ],
     }
     return {
         "report": report,
         "lasso": lasso,
-        "ridge": ridge,
-        "X": X,
-        "y": y,
-        "labels": labels,
+        "X_train": X_train,
+        "y_train": y_train,
+        "X_test": X_test,
+        "y_test": y_test,
+        "labels_train": labels_train,
+        "labels_test": labels_test,
+    }
+
+
+def _rounded_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float | None]:
+    return {k: _round(v, 4) for k, v in regression_metrics(y_true, y_pred).items()}
+
+
+def predict_pysr_frozen(X: pd.DataFrame) -> np.ndarray:
+    return (
+        0.687504
+        - 0.436873 * X["relaxed"].to_numpy(dtype=float)
+        + 0.044354 * X["onset_rate"].to_numpy(dtype=float)
+        + 0.063815 * X["intensity"].to_numpy(dtype=float)
+        - 0.019298 * X["dynamic_range"].to_numpy(dtype=float)
+    )
+
+
+def compact_ols_formula(pipeline: Pipeline) -> str:
+    """Write compact OLS in raw feature units (no z-scoring at inference)."""
+    scaler: StandardScaler = pipeline.named_steps["prep"]
+    model: LinearRegression = pipeline.named_steps["model"]
+    means = scaler.mean_
+    scales = scaler.scale_
+    weights = np.asarray(model.coef_, dtype=float)
+    intercept = float(model.intercept_)
+    raw_intercept = intercept
+    terms: list[str] = []
+    for name, mean, scale, weight in zip(COMPACT_FEATURES, means, scales, weights):
+        if abs(scale) < 1e-12:
+            continue
+        coef = weight / scale
+        raw_intercept -= weight * mean / scale
+        terms.append(f"{coef:+.6f}*{name}")
+    body = " ".join(terms)
+    return f"{raw_intercept:.6f} {body}".replace(" + -", " - ")
+
+
+def compare_formula_models(
+    tracks: list[dict[str, Any]],
+    *,
+    test_frac: float = DEFAULT_TEST_FRAC,
+    random_state: int = RANDOM_STATE,
+) -> dict[str, Any]:
+    """Train closed-form models on an ASP hold-out split (not the 10 outside FLACs)."""
+    X, y, labels = tracks_to_frame(tracks)
+    assert y is not None
+    X_train, y_train, _labels_train, X_test, y_test, _labels_test = split_labeled(
+        X, y, labels, test_frac=test_frac, random_state=random_state
+    )
+    mean_train = float(y_train.mean())
+    fitted: dict[str, Pipeline] = {}
+    model_reports: dict[str, Any] = {
+        "mean_baseline": {
+            "formula": f"{mean_train:.6f}",
+            "note": "constant training-set mean",
+            "test": _rounded_metrics(y_test, np.full_like(y_test, mean_train)),
+        }
+    }
+
+    compact_ols = make_compact_ols()
+    compact_ols.fit(X_train[list(COMPACT_FEATURES)], y_train)
+    fitted["compact_ols"] = compact_ols
+    compact_pred = compact_ols.predict(X_test[list(COMPACT_FEATURES)])
+    model_reports["compact_ols"] = {
+        "formula": compact_ols_formula(compact_ols),
+        "features": list(COMPACT_FEATURES),
+        "note": "OLS on 7 numeric features including loudness; short linear equation",
+        "test": _rounded_metrics(y_test, compact_pred),
+        "coefficients": coefficient_table(compact_ols),
+    }
+
+    compact_splines = make_compact_splines()
+    compact_splines.fit(X_train[list(COMPACT_FEATURES)], y_train)
+    fitted["compact_splines"] = compact_splines
+    spline_pred = compact_splines.predict(X_test[list(COMPACT_FEATURES)])
+    model_reports["compact_splines"] = {
+        "formula": "sum of cubic B-splines on compact features (6 knots) + Ridge",
+        "features": list(COMPACT_FEATURES),
+        "note": "still a closed-form additive function, not a tree or net",
+        "test": _rounded_metrics(y_test, spline_pred),
+    }
+
+    ols = make_ols()
+    ols.fit(X_train, y_train)
+    fitted["ols"] = ols
+    model_reports["ols"] = {
+        "formula": "linear combination of all encoded aspAudioFeatures",
+        "note": "ordinary least squares; dense linear formula",
+        "test": _rounded_metrics(y_test, ols.predict(X_test)),
+        "coefficients": coefficient_table(ols)[:16],
+    }
+
+    ridge = make_ridge()
+    ridge.fit(X_train, y_train)
+    fitted["ridge"] = ridge
+    ridge_model = ridge.named_steps["model"]
+    model_reports["ridge"] = {
+        "formula": "linear combination of all encoded aspAudioFeatures (L2)",
+        "alpha": _round(float(ridge_model.alpha_), 6),
+        "test": _rounded_metrics(y_test, ridge.predict(X_test)),
+        "coefficients": coefficient_table(ridge)[:16],
+    }
+
+    elastic = make_elastic_net()
+    elastic.fit(X_train, y_train)
+    fitted["elastic_net"] = elastic
+    elastic_model = elastic.named_steps["model"]
+    elastic_coefs = coefficient_table(elastic)
+    n_nonzero = sum(1 for row in elastic_coefs if row["nonzero"] and row["feature"] != "(intercept)")
+    model_reports["elastic_net"] = {
+        "formula": "sparse linear combination (L1+L2) of encoded aspAudioFeatures",
+        "alpha": _round(float(elastic_model.alpha_), 6),
+        "l1_ratio": _round(float(elastic_model.l1_ratio_), 4),
+        "n_nonzero": int(n_nonzero),
+        "test": _rounded_metrics(y_test, elastic.predict(X_test)),
+        "coefficients": elastic_coefs[:16],
+    }
+
+    lasso = make_lasso()
+    lasso.fit(X_train, y_train)
+    fitted["lasso"] = lasso
+    lasso_model = lasso.named_steps["model"]
+    lasso_coefs = coefficient_table(lasso)
+    lasso_nonzero = sum(1 for row in lasso_coefs if row["nonzero"] and row["feature"] != "(intercept)")
+    model_reports["lasso"] = {
+        "formula": "sparse linear combination (L1) after dropping near-zero weights",
+        "alpha": _round(float(lasso_model.alpha_), 6),
+        "n_nonzero": int(lasso_nonzero),
+        "test": _rounded_metrics(y_test, lasso.predict(X_test)),
+        "coefficients": lasso_coefs[:16],
+    }
+
+    X_train_sel = lasso.named_steps["select"].transform(lasso.named_steps["prep"].transform(X_train))
+    X_test_sel = lasso.named_steps["select"].transform(lasso.named_steps["prep"].transform(X_test))
+    lasso_ols = LinearRegression()
+    lasso_ols.fit(X_train_sel, y_train)
+    model_reports["lasso_then_ols"] = {
+        "formula": "OLS refit on the features Lasso kept (still linear)",
+        "n_selected": int(X_train_sel.shape[1]),
+        "test": _rounded_metrics(y_test, lasso_ols.predict(X_test_sel)),
+    }
+
+    model_reports["pysr_frozen"] = {
+        "formula": PYSR_FROZEN,
+        "note": "existing 4-term PySR equation; not refit on this split",
+        "test": _rounded_metrics(y_test, predict_pysr_frozen(X_test)),
+    }
+
+    ranking = sorted(
+        (
+            {
+                "model": name,
+                "mae": payload["test"]["mae"],
+                "r2": payload["test"]["r2"],
+                "spearman_r": payload["test"]["spearman_r"],
+            }
+            for name, payload in model_reports.items()
+        ),
+        key=lambda row: (row["mae"] if row["mae"] is not None else 9e9, -(row["r2"] or 0)),
+    )
+    return {
+        "evaluation": (
+            f"held-out test ({test_frac:.0%} of {len(y)} labeled ASP tracks, "
+            f"seed {random_state}); penalties tuned with 5-fold CV on train only. "
+            "The 10 outside FLACs are not used."
+        ),
+        "n_train": int(len(y_train)),
+        "n_test": int(len(y_test)),
+        "target": TARGET,
+        "ranking_by_test_mae": ranking,
+        "models": model_reports,
+        "pipelines": fitted,
     }
 
 
@@ -417,12 +689,11 @@ def slim_tracks(tracks: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def save_artifacts(result: dict[str, Any], output_dir: Path) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     joblib.dump(result["lasso"], output_dir / "lasso_pipeline.joblib")
-    joblib.dump(result["ridge"], output_dir / "ridge_pipeline.joblib")
     (output_dir / "metrics.json").write_text(json.dumps(result["report"], indent=2) + "\n")
 
 
 def load_tracks(path: Path) -> list[dict[str, Any]]:
-    raw = path.read_text()
+    raw = path.read_text(encoding="utf-8")
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
@@ -470,13 +741,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
 
-    train_p = sub.add_parser("train", help="Fit Lasso and Ridge and write artifacts.")
+    train_p = sub.add_parser("train", help="Fit Lasso and write artifacts.")
     train_p.add_argument("--input", required=True, type=Path, help="ASP tracks JSON array or JSONL.")
     train_p.add_argument(
         "--output-dir",
         type=Path,
         default=Path("models"),
-        help="Directory for joblib pipelines and metrics.json.",
+        help="Directory for the Lasso pipeline and metrics.json.",
     )
     train_p.add_argument(
         "--slim-out",
@@ -485,16 +756,39 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Optional lyrics-free features-only copy of the tracks.",
     )
     train_p.add_argument(
-        "--kfold",
-        type=int,
-        default=0,
-        help="Use K-fold instead of leave-one-out for the outer evaluation (0 = LOO).",
+        "--test-frac",
+        type=float,
+        default=DEFAULT_TEST_FRAC,
+        help="Fraction of --input held out as the test set (0 = score the training tracks).",
+    )
+    train_p.add_argument(
+        "--test-input",
+        type=Path,
+        default=None,
+        help="Optional separate test-set JSON/JSONL. Overrides --test-frac.",
     )
 
-    pred_p = sub.add_parser("predict", help="Score tracks with a saved pipeline.")
+    pred_p = sub.add_parser("predict", help="Score tracks with the saved Lasso pipeline.")
     pred_p.add_argument("--input", required=True, type=Path)
-    pred_p.add_argument("--model", choices=("lasso", "ridge"), default="lasso")
     pred_p.add_argument("--model-dir", type=Path, default=Path("models"))
+
+    cmp_p = sub.add_parser(
+        "compare",
+        help="Train closed-form models on an ASP train/test split and print test metrics.",
+    )
+    cmp_p.add_argument("--input", required=True, type=Path)
+    cmp_p.add_argument(
+        "--test-frac",
+        type=float,
+        default=DEFAULT_TEST_FRAC,
+        help="Held-out fraction of --input (the 10 outside FLACs are not used).",
+    )
+    cmp_p.add_argument(
+        "--output",
+        type=Path,
+        default=Path("models") / "formula_compare.json",
+        help="Where to write the comparison report.",
+    )
     return parser
 
 
@@ -502,12 +796,12 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "train":
         tracks = load_tracks(args.input)
-        outer = (
-            KFold(n_splits=args.kfold, shuffle=True, random_state=RANDOM_STATE)
-            if args.kfold and args.kfold > 1
-            else None
+        test_tracks = load_tracks(args.test_input) if args.test_input is not None else None
+        result = train_and_evaluate(
+            tracks,
+            test_frac=0.0 if test_tracks is not None else args.test_frac,
+            test_tracks=test_tracks,
         )
-        result = train_and_evaluate(tracks, outer_cv=outer)
         save_artifacts(result, args.output_dir)
         if args.slim_out is not None:
             slim_path: Path = args.slim_out
@@ -517,13 +811,13 @@ def main(argv: list[str] | None = None) -> int:
         print(
             json.dumps(
                 {
-                    "n_tracks": result["report"]["n_tracks"],
+                    "evaluation": result["report"]["evaluation"],
+                    "n_train": result["report"]["n_train"],
+                    "n_test": result["report"]["n_test"],
                     "n_encoded_features": result["report"]["n_encoded_features"],
                     "n_selected_features": result["report"]["n_selected_features"],
                     "dropped_features": result["report"]["dropped_features"],
                     "lasso": models["lasso"],
-                    "ridge": models["ridge"],
-                    "ols": models["ols"],
                     "mean_baseline": models["mean_baseline"],
                     "artifacts": str(args.output_dir),
                 },
@@ -532,8 +826,28 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    model_file = args.model_dir / f"{args.model}_pipeline.joblib"
-    pipeline = joblib.load(model_file)
+    if args.command == "compare":
+        tracks = load_tracks(args.input)
+        result = compare_formula_models(tracks, test_frac=args.test_frac)
+        payload = {k: v for k, v in result.items() if k != "pipelines"}
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_text(json.dumps(payload, indent=2) + "\n")
+        print(
+            json.dumps(
+                {
+                    "evaluation": payload["evaluation"],
+                    "n_train": payload["n_train"],
+                    "n_test": payload["n_test"],
+                    "ranking_by_test_mae": payload["ranking_by_test_mae"],
+                    "compact_ols_formula": payload["models"]["compact_ols"]["formula"],
+                    "report": str(args.output),
+                },
+                indent=2,
+            )
+        )
+        return 0
+
+    pipeline = joblib.load(args.model_dir / "lasso_pipeline.joblib")
     print(json.dumps(predict_tracks(load_tracks(args.input), pipeline), indent=2))
     return 0
 

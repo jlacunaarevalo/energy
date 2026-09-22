@@ -1,8 +1,8 @@
 """Discover a closed-form ``aspEnergy`` formula with PySR.
 
 Lasso (from ``asp_energy``) drops near-zero coefficients; PySR then searches
-an explicit expression on the surviving numeric features, using every labeled
-track in the input JSON / JSONL.
+an explicit expression on the surviving numeric features. Headline metrics
+are a held-out test split (default 20%); selection and search use train only.
 """
 
 from __future__ import annotations
@@ -23,6 +23,7 @@ from asp_energy import (
     NUMERIC_FEATURES,
     RANDOM_STATE,
     TARGET,
+    DEFAULT_TEST_FRAC,
     extract_feature_row,
     lasso_selection,
     load_tracks,
@@ -30,6 +31,7 @@ from asp_energy import (
     regression_metrics,
     selected_numeric_features,
     selector_abs_coef,
+    split_labeled,
     tracks_to_frame,
 )
 
@@ -267,7 +269,9 @@ def _equation_records(
             chosen = position
     if not records:
         raise ValueError("PySR returned no equations")
-    return records, chosen
+    winner = records[chosen]
+    winner["index"] = 0
+    return [winner], 0
 
 
 def fit_formula(
@@ -278,16 +282,37 @@ def fit_formula(
     maxsize: int = 20,
     timeout: int = 300,
     output_dir: Path = Path("models"),
+    test_frac: float = DEFAULT_TEST_FRAC,
+    test_tracks: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     X, y, labels = tracks_to_frame(tracks, require_target=True)
     assert y is not None
-    lasso = fit_lasso_selector(X, y)
+    if test_tracks is not None:
+        X_train, y_train, labels_train = X, y, labels
+        X_test, y_test, labels_test = tracks_to_frame(test_tracks, require_target=True)
+        assert y_test is not None
+        evaluation = (
+            f"held-out test file ({len(y_test)} tracks); "
+            "Lasso selection and PySR fit on train only"
+        )
+    else:
+        X_train, y_train, labels_train, X_test, y_test, labels_test = split_labeled(
+            X, y, labels, test_frac=test_frac
+        )
+        if test_frac <= 0:
+            evaluation = "in-sample (no held-out test set); Lasso selection and PySR fit on all tracks"
+        else:
+            evaluation = (
+                f"held-out test ({test_frac:.0%} of {len(y)} labeled tracks, "
+                f"seed {RANDOM_STATE}); Lasso selection and PySR fit on train only"
+            )
+    lasso = fit_lasso_selector(X_train, y_train)
     selection = lasso_selection(lasso)
-    features = pysr_feature_list(lasso, X, max_features=max_features)
+    features = pysr_feature_list(lasso, X_train, max_features=max_features)
     if not features:
         raise ValueError("Lasso dropped every numeric feature; cannot run PySR")
-    stats = feature_stats(X, features)
-    X_z = standardize(X, stats)
+    stats = feature_stats(X_train, features)
+    X_z = standardize(X_train, stats)
     model = make_pysr_regressor(
         niterations=niterations,
         maxsize=maxsize,
@@ -295,19 +320,22 @@ def fit_formula(
         output_dir=output_dir,
         feature_names=features,
     )
-    model.fit(X_z[features], y)
-    equations, chosen = _equation_records(model, X, y, stats, features)
+    model.fit(X_z[features], y_train)
+    equations, chosen = _equation_records(model, X_train, y_train, stats, features)
     best = equations[chosen]
-    pred = evaluate_formula(
-        {"features": features, "sympy": best["sympy"], "equations": equations},
-        X,
-        chosen,
-    )
-    metrics = {k: round(v, 4) for k, v in regression_metrics(y, pred).items()}
+    skeleton = {"features": features, "sympy": best["sympy"], "equations": equations}
+    pred_test = evaluate_formula(skeleton, X_test, chosen)
+    pred_train = evaluate_formula(skeleton, X_train, chosen)
+    metrics = {k: round(v, 4) for k, v in regression_metrics(y_test, pred_test).items()}
+    train_metrics = {k: round(v, 4) for k, v in regression_metrics(y_train, pred_train).items()}
+    n_all = int(len(y_train) if test_tracks is None and test_frac <= 0 else len(y_train) + len(y_test))
     payload = {
         "target": TARGET,
         "feature_object": FEATURE_OBJECT,
-        "n_tracks": int(len(y)),
+        "n_tracks": n_all,
+        "n_train": int(len(y_train)),
+        "n_test": int(len(y_test)),
+        "evaluation": evaluation,
         "features": features,
         "feature_stats": stats,
         "lasso_kept": selection["kept"],
@@ -315,18 +343,20 @@ def fit_formula(
         "formula": best["formula"],
         "sympy": best["sympy"],
         "latex": best["latex"],
-        "chosen_index": chosen,
+        "chosen_index": 0,
         "metrics": metrics,
+        "train_metrics": train_metrics,
         "equations": equations,
         "predictions": [
             {
                 "track": label,
+                "split": "test",
                 "actual": round(float(actual), 4),
                 "predicted": round(float(hat), 4),
                 "deviation": round(float(hat - actual), 4),
                 "abs_deviation": round(abs(float(hat - actual)), 4),
             }
-            for label, actual, hat in zip(labels, y, pred)
+            for label, actual, hat in zip(labels_test, y_test, pred_test)
         ],
     }
     return payload
@@ -441,11 +471,19 @@ def _formula_markdown(payload: dict[str, Any], equation_index: int | None = None
         "",
         f"Features used: `{kept}`",
         f"Lasso dropped {dropped_n} encoded columns before PySR.",
-        f"Fit on **{payload.get('n_tracks', '?')}** tracks.",
+        f"Fit on **{payload.get('n_train', payload.get('n_tracks', '?'))}** training tracks"
+        + (
+            f"; scored on **{payload['n_test']}** held-out test tracks."
+            if payload.get("n_test") and payload.get("evaluation", "").startswith("held-out")
+            else "."
+        ),
     ]
+    if payload.get("evaluation"):
+        lines.append(payload["evaluation"])
     if shown:
+        split_name = "Test" if "held-out" in str(payload.get("evaluation", "")) else "Fit"
         lines.append(
-            "In-sample: "
+            f"{split_name}: "
             + ", ".join(f"{k.upper()}={shown[k]}" for k in ("r2", "rmse", "mae") if k in shown)
         )
     return "\n".join(lines)
@@ -455,40 +493,25 @@ def build_app(formula_path: Path):
     import gradio as gr
 
     payload = load_formula(formula_path)
-    features: list[str] = list(payload["features"])
+    features: list[str] = used_features(payload) or list(payload["features"])
     stats = payload.get("feature_stats") or {}
-    equation_choices = [
-        f"{i}: complexity {eq.get('complexity', '?')}  R²={eq.get('r2', '?')}  {eq.get('formula')}"
-        for i, eq in enumerate(payload.get("equations") or [{"formula": payload["sympy"]}])
-    ]
-    default_index = int(payload.get("chosen_index", 0))
-    if default_index >= len(equation_choices):
-        default_index = 0
 
-    def _index_from_choice(choice: str | None) -> int:
-        if not choice:
-            return default_index
-        return int(str(choice).split(":", 1)[0])
-
-    def update_formula(choice: str):
-        return _formula_markdown(payload, _index_from_choice(choice))
-
-    def from_file(file_obj, choice: str):
+    def from_file(file_obj):
         if file_obj is None:
             raise gr.Error("Upload a JSON or JSONL file first.")
         path = Path(file_obj)
-        rows = score_tracks(load_tracks(path), payload, _index_from_choice(choice))
+        rows = score_tracks(load_tracks(path), payload)
         return pd.DataFrame(rows)
 
-    def from_text(text: str, choice: str):
-        rows = score_tracks(parse_tracks_text(text), payload, _index_from_choice(choice))
+    def from_text(text: str):
+        rows = score_tracks(parse_tracks_text(text), payload)
         return pd.DataFrame(rows)
 
     def from_manual(*args):
-        *feature_values, actual, choice = args
+        *feature_values, actual = args
         values = {name: float(value) for name, value in zip(features, feature_values)}
         actual_value = None if actual is None or actual == "" else float(actual)
-        result = score_manual(values, payload, actual_value, _index_from_choice(choice))
+        result = score_manual(values, payload, actual_value)
         return (
             result.get("predicted"),
             result.get("actual"),
@@ -499,16 +522,10 @@ def build_app(formula_path: Path):
     with gr.Blocks(title="aspEnergy formula") as demo:
         gr.Markdown("# Closed-form aspEnergy")
         gr.Markdown(
-            "PySR expression on features that Lasso kept. "
+            "The Lasso-selected PySR formula. "
             "Upload track JSON/JSONL, paste a track, or set coefficients manually."
         )
-        formula_md = gr.Markdown(_formula_markdown(payload, default_index))
-        equation = gr.Dropdown(
-            label="Hall-of-fame equation",
-            choices=equation_choices,
-            value=equation_choices[default_index],
-        )
-        equation.change(fn=update_formula, inputs=equation, outputs=formula_md)
+        gr.Markdown(_formula_markdown(payload))
 
         with gr.Tab("From JSON file"):
             file_in = gr.File(
@@ -518,7 +535,7 @@ def build_app(formula_path: Path):
             )
             file_btn = gr.Button("Score file", variant="primary")
             file_out = gr.Dataframe(label="Predictions")
-            file_btn.click(fn=from_file, inputs=[file_in, equation], outputs=file_out)
+            file_btn.click(fn=from_file, inputs=[file_in], outputs=file_out)
 
         with gr.Tab("Paste JSON"):
             text_in = gr.Textbox(
@@ -528,7 +545,7 @@ def build_app(formula_path: Path):
             )
             text_btn = gr.Button("Score pasted JSON", variant="primary")
             text_out = gr.Dataframe(label="Predictions")
-            text_btn.click(fn=from_text, inputs=[text_in, equation], outputs=text_out)
+            text_btn.click(fn=from_text, inputs=[text_in], outputs=text_out)
 
         with gr.Tab("Manual coefficients"):
             manual_inputs = []
@@ -553,7 +570,7 @@ def build_app(formula_path: Path):
             abs_out = gr.Number(label="Absolute deviation")
             manual_btn.click(
                 fn=from_manual,
-                inputs=[*manual_inputs, actual_in, equation],
+                inputs=[*manual_inputs, actual_in],
                 outputs=[pred_out, actual_out, dev_out, abs_out],
             )
 
@@ -571,6 +588,18 @@ def _build_parser() -> argparse.ArgumentParser:
     fit_p.add_argument("--niterations", type=int, default=60)
     fit_p.add_argument("--maxsize", type=int, default=20)
     fit_p.add_argument("--timeout", type=int, default=300, help="PySR timeout in seconds.")
+    fit_p.add_argument(
+        "--test-frac",
+        type=float,
+        default=DEFAULT_TEST_FRAC,
+        help="Fraction of --input held out as the test set (0 = score the training tracks).",
+    )
+    fit_p.add_argument(
+        "--test-input",
+        type=Path,
+        default=None,
+        help="Optional separate test-set JSON/JSONL. Overrides --test-frac.",
+    )
 
     pred_p = sub.add_parser("predict", help="Evaluate a saved formula on tracks.")
     pred_p.add_argument("--input", required=True, type=Path)
@@ -595,6 +624,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command == "fit":
         tracks = load_tracks(args.input)
+        test_tracks = load_tracks(args.test_input) if args.test_input is not None else None
         payload = fit_formula(
             tracks,
             max_features=args.max_features,
@@ -602,6 +632,8 @@ def main(argv: list[str] | None = None) -> int:
             maxsize=args.maxsize,
             timeout=args.timeout,
             output_dir=args.output_dir,
+            test_frac=0.0 if test_tracks is not None else args.test_frac,
+            test_tracks=test_tracks,
         )
         path = args.output_dir / DEFAULT_FORMULA_NAME
         save_formula(payload, path)
@@ -611,8 +643,11 @@ def main(argv: list[str] | None = None) -> int:
                     "formula": payload["formula"],
                     "latex": payload["latex"],
                     "features": payload["features"],
+                    "evaluation": payload.get("evaluation"),
+                    "n_train": payload.get("n_train"),
+                    "n_test": payload.get("n_test"),
                     "metrics": payload["metrics"],
-                    "n_tracks": payload["n_tracks"],
+                    "train_metrics": payload.get("train_metrics"),
                     "lasso_dropped": payload["lasso_dropped"],
                     "artifact": str(path),
                 },

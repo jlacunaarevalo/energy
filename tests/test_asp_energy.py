@@ -6,11 +6,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-from sklearn.model_selection import KFold
 
 from asp_energy import (
     FEATURE_OBJECT,
     TARGET,
+    compare_formula_models,
     extract_feature_row,
     load_tracks,
     main,
@@ -98,6 +98,9 @@ def test_extract_uses_only_asp_audio_features():
     assert row["language"] in LANGS
     assert TARGET not in row
     assert "popularity" not in row
+    str_lang = extract_feature_row({**make_tracks(1)[0][FEATURE_OBJECT], "language": "en"})
+    assert str_lang["language"] == "en"
+    assert str_lang["language_probability"] == 0.0
 
 
 def test_tracks_to_frame_skips_incomplete_and_ignores_lyrics():
@@ -110,26 +113,39 @@ def test_tracks_to_frame_skips_incomplete_and_ignores_lyrics():
     assert "lyrics" not in frame.columns
 
 
-def test_lasso_and_ridge_beat_mean_on_linear_target(tmp_path: Path):
+def test_lasso_beats_mean_on_held_out_test(tmp_path: Path):
     tracks = make_tracks(40)
-    result = train_and_evaluate(
-        tracks,
-        outer_cv=KFold(n_splits=5, shuffle=True, random_state=42),
-    )
-    models = result["report"]["models"]
-    assert models["lasso"]["loo"]["r2"] > 0.7
-    assert models["ridge"]["loo"]["r2"] > 0.7
-    assert models["lasso"]["loo"]["r2"] > models["mean_baseline"]["loo"]["r2"]
-    top = [row["feature"] for row in result["report"]["lasso_coefficients"][:8]]
+    result = train_and_evaluate(tracks, test_frac=0.25)
+    report = result["report"]
+    models = report["models"]
+    assert report["n_train"] == 30
+    assert report["n_test"] == 10
+    assert set(result["labels_train"]).isdisjoint(result["labels_test"])
+    assert models["lasso"]["test"]["r2"] > 0.7
+    assert models["lasso"]["test"]["r2"] > models["mean_baseline"]["test"]["r2"]
+    assert "ridge" not in models
+    assert "ols" not in models
+    top = [row["feature"] for row in report["lasso_coefficients"][:8]]
     assert "happy" in top
     assert "relaxed" in top
 
     out = tmp_path / "models"
     save_artifacts(result, out)
     assert (out / "lasso_pipeline.joblib").exists()
+    assert not (out / "ridge_pipeline.joblib").exists()
     scored = predict_tracks(tracks[:3], result["lasso"])
     assert len(scored) == 3
     assert scored[0]["predicted"] is not None
+
+
+def test_separate_test_file_is_not_used_for_fitting():
+    train = make_tracks(30, seed=0)
+    test = make_tracks(12, seed=1)
+    result = train_and_evaluate(train, test_tracks=test)
+    assert result["report"]["n_train"] == 30
+    assert result["report"]["n_test"] == 12
+    assert "held-out test file" in result["report"]["evaluation"]
+    assert len(result["report"]["predictions"]) == 12
 
 
 def test_cli_train_and_predict(tmp_path: Path):
@@ -143,8 +159,8 @@ def test_cli_train_and_predict(tmp_path: Path):
             str(tracks_path),
             "--output-dir",
             str(model_dir),
-            "--kfold",
-            "4",
+            "--test-frac",
+            "0.25",
             "--slim-out",
             str(tmp_path / "slim.json"),
         ]
@@ -158,8 +174,6 @@ def test_cli_train_and_predict(tmp_path: Path):
             "predict",
             "--input",
             str(tracks_path),
-            "--model",
-            "lasso",
             "--model-dir",
             str(model_dir),
         ]
@@ -178,10 +192,7 @@ def test_lasso_pipeline_is_sklearn_pipeline():
 
 def test_lasso_drops_zero_coefficients():
     tracks = make_tracks(40)
-    result = train_and_evaluate(
-        tracks,
-        outer_cv=KFold(n_splits=5, shuffle=True, random_state=42),
-    )
+    result = train_and_evaluate(tracks, test_frac=0.25)
     report = result["report"]
     kept = report["selected_features"]
     dropped = report["dropped_features"]
@@ -204,3 +215,28 @@ def test_load_tracks_jsonl(tmp_path: Path):
     loaded = load_tracks(path)
     assert len(loaded) == 3
     assert loaded[0]["_id"] == "track-000"
+
+
+def test_compare_formula_models_on_synthetic():
+    tracks = make_tracks(48)
+    result = compare_formula_models(tracks, test_frac=0.25)
+    models = result["models"]
+    assert result["n_train"] == 36
+    assert result["n_test"] == 12
+    for name in (
+        "mean_baseline",
+        "compact_ols",
+        "compact_splines",
+        "ols",
+        "ridge",
+        "elastic_net",
+        "lasso",
+        "lasso_then_ols",
+        "pysr_frozen",
+    ):
+        assert models[name]["test"]["mae"] is not None
+    assert models["lasso"]["test"]["r2"] > models["mean_baseline"]["test"]["r2"]
+    assert models["elastic_net"]["test"]["r2"] > models["mean_baseline"]["test"]["r2"]
+    assert "loudness" in models["compact_ols"]["formula"]
+    assert result["ranking_by_test_mae"][0]["mae"] <= models["mean_baseline"]["test"]["mae"]
+

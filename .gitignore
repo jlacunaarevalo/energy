@@ -9,6 +9,7 @@ build/
 .env
 models/*.joblib
 models/metrics.json
+models/formula_compare.json
 models/pysr/
 models/pysr*/
 outputs/

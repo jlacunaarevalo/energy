@@ -9,12 +9,15 @@
 \usepackage{amsmath}
 \usepackage{xcolor}
 \usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 
 % Colors
 \definecolor{aspblue}{RGB}{30, 90, 160}
 \definecolor{aspgray}{RGB}{90, 90, 90}
 \definecolor{aspgreen}{RGB}{34, 139, 34}
 \definecolor{aspred}{RGB}{180, 30, 30}
+\definecolor{aspyellow}{RGB}{200, 140, 0}
 
 \setbeamercolor{frametitle}{bg=aspblue, fg=white}
 \setbeamercolor{title}{fg=white}
@@ -29,7 +32,7 @@
 \setbeamertemplate{footline}[frame number]
 
 \title{Construcción del Modelo de Predicción de aspEnergy}
-\subtitle{Regresión Polinomial con Lasso}
+\subtitle{Información Mutua · Expansión Polinomial · Lasso}
 \author{}
 \date{}
 
@@ -40,15 +43,42 @@
   \titlepage
 \end{frame}
 
-% ── 1. Selección de características ───────────────────────────────────────
-\begin{frame}{Punto de partida: las características}
+% ── 0. Hoja de ruta ────────────────────────────────────────────────────────
+\begin{frame}{El proceso en cuatro pasos}
+  \begin{center}
+  \begin{tikzpicture}[node distance=2.6cm, every node/.style={font=\small}]
+    \tikzstyle{step} = [rectangle, rounded corners, draw=aspblue, fill=aspblue!10,
+                        text width=2.8cm, text centered, minimum height=1.1cm, line width=1pt]
+    \tikzstyle{arrow} = [->, thick, color=aspblue]
 
-  \textbf{23 campos numéricos de aspAudioFeatures disponibles.}
+    \node[step] (mi)   {\textbf{1.} Información Mutua\\\footnotesize ¿qué features importan?};
+    \node[step] (poly) [right of=mi] {\textbf{2.} Expansión polinomial\\\footnotesize capturar interacciones};
+    \node[step] (lasso)[right of=poly] {\textbf{3.} Lasso + CV\\\footnotesize regularizar y podar};
+    \node[step] (val)  [right of=lasso] {\textbf{4.} Validación\\\footnotesize medir generalización};
+
+    \draw[arrow] (mi)   -- (poly);
+    \draw[arrow] (poly) -- (lasso);
+    \draw[arrow] (lasso)-- (val);
+  \end{tikzpicture}
+  \end{center}
 
   \bigskip
   \begin{columns}
+    \column{0.6\textwidth}
+      \textbf{Restricción del proyecto:} el resultado final debe ser una \textbf{fórmula aritmética explícita} — sin redes neuronales ni modelos de caja negra.
+    \column{0.35\textwidth}
+      \begin{block}{\small Datos de entrenamiento}
+        \small 137{,}442 canciones con aspAudioFeatures y su aspEnergy correspondiente
+      \end{block}
+  \end{columns}
+\end{frame}
+
+% ── 1. Selección de características ───────────────────────────────────────
+\begin{frame}{Paso 1 — ¿Qué features usar?}
+
+  \begin{columns}
     \column{0.48\textwidth}
-      \textbf{Incluidas (20):}
+      \textbf{23 campos numéricos disponibles en aspAudioFeatures:}
       \small
       \begin{itemize}
         \item Mood: danceability, acoustic, aggressive, happy, party, relaxed, sad
@@ -59,167 +89,255 @@
       \end{itemize}
 
     \column{0.48\textwidth}
-      \textbf{\color{aspred}Excluidas (3):}
-      \small
-      \begin{itemize}
-        \item \texttt{key} — valor de texto (ej. ``Eb'')
-        \item \texttt{chord} — valor de texto (ej. ``C\#'')
-        \item \texttt{mode} — valor de texto
-      \end{itemize}
+      \begin{alertblock}{\color{aspred}Excluidas (3)}
+        \texttt{key}, \texttt{chord}, \texttt{mode} son campos de \textbf{texto} (ej. ``Eb'', ``C\#''), no numéricos.
+
+        \medskip
+        Incluirlos en un modelo anterior causó coerción silenciosa a~0, inflando el R²~=~0.99 en entrenamiento pero colapsando a \textbf{R²~=~0.548} fuera de muestra.
+      \end{alertblock}
+
       \bigskip
-      \begin{block}{\small ¿Por qué importa?}
-        \small Incluirlas en el modelo anterior causó coerción silenciosa a~0, inflando el R²~=~0.99 en entrenamiento pero colapsando a R²~=~0.548 fuera de muestra.
-      \end{block}
+      \textbf{$\Rightarrow$ Se trabajó con 20 features numéricas.}
   \end{columns}
 \end{frame}
 
-% ── 2. El enfoque: Polinomial + Lasso ─────────────────────────────────────
-\begin{frame}{El enfoque: Expansión Polinomial + Lasso}
+% ── 2. Información Mutua ──────────────────────────────────────────────────
+\begin{frame}{Paso 2 — Información Mutua (MI)}
+
+  \begin{columns}
+    \column{0.52\textwidth}
+      \textbf{¿Qué es?}\\
+      La MI mide la \textbf{dependencia estadística no lineal} entre cada feature y aspEnergy — a diferencia de la correlación de Pearson, captura relaciones curvas y de umbral.
+
+      \bigskip
+      \textbf{¿Para qué la usamos?}
+      \begin{itemize}
+        \item Entender cuáles features aportan más información \textit{antes} de ajustar el modelo
+        \item Comparar un modelo con las top-12 features~(MI-12) vs.\ uno con las 20 features
+        \item Verificar que el Lasso llega a conclusiones coherentes con el ranking de MI
+      \end{itemize}
+
+    \column{0.44\textwidth}
+      \textbf{Ranking MI (top features):}
+      \bigskip
+
+      \begin{tikzpicture}
+        \begin{axis}[
+          xbar, xmin=0, xmax=0.42,
+          width=5.5cm, height=6.5cm,
+          bar width=5pt,
+          ytick=data,
+          yticklabels={acoustic, intensity, danceability, happy, sad, party, aggressive, relaxed},
+          yticklabel style={font=\tiny},
+          xticklabel style={font=\tiny},
+          xtick={0,0.1,0.2,0.3,0.4},
+          xticklabels={0,.1,.2,.3,.4},
+          xlabel={\tiny MI score},
+          xlabel style={font=\tiny},
+          nodes near coords style={font=\tiny},
+          enlarge y limits=0.12,
+          ]
+          \addplot[fill=aspblue!70] coordinates {
+            (0.09,0) (0.11,1) (0.16,2) (0.19,3)
+            (0.22,4) (0.25,5) (0.31,6) (0.39,7)
+          };
+        \end{axis}
+      \end{tikzpicture}
+  \end{columns}
+
+  \bigskip
+  \begin{block}{Conclusión del análisis de MI}
+    \small Los features de mood dominan. Modelo MI-12 (top 12) vs.\ modelo con las 20 features $\Rightarrow$ diferencia en R² $<$ 0.002. \textbf{El Lasso puede hacer la selección solo}, por lo que se usaron las 20 features y se dejó que la regularización decidiera.
+  \end{block}
+\end{frame}
+
+% ── 3. Expansión polinomial ────────────────────────────────────────────────
+\begin{frame}{Paso 3 — Expansión Polinomial grado-2}
 
   \begin{block}{Motivación}
-    La energía perceptual no es lineal: una canción con alto \textit{aggressive} \textbf{y} alto \textit{relaxed} simultáneamente es distinta de una con solo uno de esos rasgos.
+    La energía perceptual depende de \textbf{combinaciones} de rasgos, no de cada uno por separado. Una canción agresiva-y-relajada a la vez es distinta de una solo agresiva.
   \end{block}
 
   \bigskip
-  \begin{enumerate}
-    \item \textbf{Expansión grado-2:} generar todos los términos cuadráticos y productos cruzados
-    \[
-      20 \text{ features} \;\longrightarrow\; 230 \text{ términos posibles}
-    \]
-    \item \textbf{Estandarización:} \texttt{StandardScaler} — media 0, desviación estándar 1
-    \item \textbf{Lasso con validación cruzada:} \texttt{LassoCV} selecciona automáticamente el parámetro de regularización $\alpha$ y elimina los términos irrelevantes
-    \[
-      230 \text{ términos} \;\xrightarrow{\text{Lasso}}\; \mathbf{48 \text{ términos no nulos}}
-    \]
-  \end{enumerate}
-
-\end{frame}
-
-% ── 3. CV y Early Stopping ────────────────────────────────────────────────
-\begin{frame}{Validación cruzada y Early Stopping}
-
-  \textbf{¿Hasta qué punto vale la pena añadir complejidad?}
-
-  \bigskip
-  \begin{table}
-    \centering
-    \begin{tabular}{lcccc}
-      \toprule
-      \textbf{Configuración} & \textbf{R² (5-fold CV)} & \textbf{MAE} & \textbf{Ganancia} \\
-      \midrule
-      Grado-1 lineal (20 feat.)       & 0.9187 & 0.051 & — \\
-      Grado-2 polinomial (20 feat.)   & 0.9519 & 0.040 & +0.033 \\
-      Grado-2 + feat. ingenierizadas  & 0.9526 & 0.039 & \textcolor{aspred}{+0.0007} \\
-      \bottomrule
-    \end{tabular}
-  \end{table}
-
-  \bigskip
-  \begin{alertblock}{Early Stopping}
-    La ganancia al añadir \textit{log(bpm)}, ratios de mood y variables compuestas fue de solo \textbf{+0.0007} en R² — por debajo del umbral de 0.003. El proceso se detuvo en grado-2.
-  \end{alertblock}
-
-  \small
-  \textit{Los 5 folds mostraron R² estable (desviación estándar = 0.0004), confirmando que el modelo no está sobreajustado.}
-
-\end{frame}
-
-% ── 4. La fórmula ─────────────────────────────────────────────────────────
-\begin{frame}{La fórmula resultante}
-
   \[
-    \widehat{\text{aspEnergy}} = \text{clip}\!\left(\,1.014 + \sum_{i} c_i \cdot t_i,\; 0,\; 1\right)
+    20 \text{ features} \;\xrightarrow{\text{grado-2}}\;
+    \underbrace{20}_{\text{lineales}} +
+    \underbrace{20}_{\text{cuadráticos}} +
+    \underbrace{190}_{\text{productos cruzados}} =
+    \mathbf{230 \text{ términos}}
   \]
 
   \bigskip
   \begin{columns}
     \column{0.48\textwidth}
-      \textbf{\color{aspgreen}Términos positivos (aumentan energía):}
+      \textbf{Ejemplos de términos generados:}
       \small
       \begin{itemize}
-        \item happy $\times$ sad \hfill (+0.367)
-        \item danceability $\times$ relaxed \hfill (+0.284)
-        \item aggressive $\times$ happy \hfill (+0.204)
-        \item aggressive $\times$ instrumental \hfill (+0.139)
+        \item $\text{relaxed}^2$ — efecto cuadrático de relaxed
+        \item $\text{aggressive} \times \text{relaxed}$ — tensión emocional
+        \item $\text{happy} \times \text{sad}$ — contraste emocional
+        \item $\text{danceability} \times \text{loudness}$ — impulso físico
       \end{itemize}
 
-    \column{0.48\textwidth}
-      \textbf{\color{aspred}Términos negativos (reducen energía):}
-      \small
-      \begin{itemize}
-        \item aggressive $\times$ relaxed \hfill (−0.359)
-        \item relaxed \hfill (−0.291)
-        \item party $\times$ sad \hfill (−0.270)
-        \item relaxed $\times$ voice \hfill (−0.159)
-      \end{itemize}
+    \column{0.44\textwidth}
+      \begin{exampleblock}{¿Por qué no grado-3?}
+        \small
+        Grado-3 sobre 20 features $\approx$ 1{,}800 términos. Se comparó con early stopping (ver siguiente slide): la ganancia no justificó la complejidad.
+      \end{exampleblock}
   \end{columns}
-
-  \bigskip
-  \begin{block}{Interpretación}
-    La energía emerge del \textbf{contraste emocional}, no de una sola dimensión. Una canción agresiva-y-relajada a la vez \textit{cancela} energía; una happy-y-sad simultánea la \textit{amplifica}.
-  \end{block}
 
 \end{frame}
 
-% ── 5. Resultados de validación ───────────────────────────────────────────
+% ── 4. Lasso + CV y Early Stopping ────────────────────────────────────────
+\begin{frame}{Paso 4 — Lasso, Validación Cruzada y Early Stopping}
+
+  \begin{columns}
+    \column{0.52\textwidth}
+      \textbf{LassoCV:}
+      \begin{itemize}
+        \item Ajusta una penalización $\alpha$ que fuerza coeficientes a cero
+        \item Usa 5-fold CV internamente para elegir el mejor $\alpha$
+        \item Resultado: de 230 términos $\rightarrow$ \textbf{48 no nulos}
+      \end{itemize}
+
+      \bigskip
+      \textbf{Early Stopping — ¿cuándo parar?}\\
+      \small Se comparó la ganancia en R² al añadir complejidad:
+
+      \begin{table}
+        \small
+        \begin{tabular}{lcc}
+          \toprule
+          Configuración & R² & Ganancia \\
+          \midrule
+          Grado-1 (lineal)         & 0.919 & — \\
+          Grado-2 polinomial       & 0.952 & +0.033 \\
+          + features ingenierizadas& 0.953 & \textcolor{aspred}{+0.0007} \\
+          \bottomrule
+        \end{tabular}
+      \end{table}
+
+      \small\textit{Umbral de parada: 0.003. La ganancia de +0.0007 disparó el early stop.}
+
+    \column{0.44\textwidth}
+      \begin{block}{5-fold Cross-Validation}
+        El dataset de 137k canciones se divide en 5 partes iguales. El modelo se entrena 5 veces, cada vez usando una parte distinta como validación.
+        \bigskip
+
+        \small R² por fold: 0.9525 · 0.9528 · 0.9524 · 0.9531 · 0.9519\\
+        \textbf{Desviación estándar = 0.0004}\\
+        \bigskip
+        $\Rightarrow$ El modelo es estable: \textbf{no hay sobreajuste}.
+      \end{block}
+  \end{columns}
+
+\end{frame}
+
+% ── 5. La fórmula ─────────────────────────────────────────────────────────
+\begin{frame}{La fórmula resultante}
+
+  \[
+    \widehat{\text{aspEnergy}} = \text{clip}\!\left(\,1.014 + \sum_{i=1}^{48} c_i \cdot t_i,\; 0,\; 1\right)
+  \]
+
+  \bigskip
+  \begin{columns}
+    \column{0.48\textwidth}
+      \textbf{\color{aspgreen}Los 4 términos que más suman energía:}
+      \small
+      \begin{itemize}
+        \item happy $\times$ sad \hfill \textbf{+0.367}
+        \item danceability $\times$ relaxed \hfill \textbf{+0.284}
+        \item aggressive $\times$ happy \hfill \textbf{+0.204}
+        \item aggressive $\times$ instrumental \hfill \textbf{+0.139}
+      \end{itemize}
+
+      \bigskip
+      \textbf{\color{aspred}Los 4 términos que más restan energía:}
+      \small
+      \begin{itemize}
+        \item aggressive $\times$ relaxed \hfill \textbf{−0.359}
+        \item relaxed \hfill \textbf{−0.291}
+        \item party $\times$ sad \hfill \textbf{−0.270}
+        \item relaxed $\times$ voice \hfill \textbf{−0.159}
+      \end{itemize}
+
+    \column{0.48\textwidth}
+      \begin{block}{¿Qué nos dice la fórmula?}
+        Los features de MI más altos (relaxed, aggressive, sad) dominan también en la fórmula final — \textbf{consistente con el análisis de MI}.
+
+        \bigskip
+        La energía no emerge de una sola dimensión, sino del \textbf{contraste emocional}:
+        \begin{itemize}
+          \item happy$\times$sad: tensión que genera impulso
+          \item aggressive$\times$relaxed: contradicción que \textit{cancela} energía
+        \end{itemize}
+      \end{block}
+  \end{columns}
+
+\end{frame}
+
+% ── 6. Resultados ─────────────────────────────────────────────────────────
 \begin{frame}{Resultados de validación}
 
   \begin{columns}
     \column{0.48\textwidth}
-      \begin{block}{Validación interna (137k canciones)}
-        \begin{itemize}
-          \item \textbf{R²} = 0.9525
-          \item \textbf{MAE} = 0.039
-          \item \textbf{Sesgo} $\approx$ 0 (±0.0004)
-          \item Estable en los 5 folds
-        \end{itemize}
+      \begin{block}{5-fold CV — 137k canciones (entrenamiento)}
+        \begin{tabular}{ll}
+          R²  & \textbf{0.9525} \\
+          MAE & 0.039 \\
+          Sesgo & $\approx$ 0 \\
+        \end{tabular}
       \end{block}
 
       \bigskip
-      \begin{block}{18 canciones fuera de base (zero-shot)}
-        \begin{itemize}
-          \item \textbf{R²} = 0.9564
-          \item \textbf{MAE} = 0.025
-          \item 17 de 18 canciones con error $<$ 0.05
-        \end{itemize}
+      \begin{block}{18 canciones fuera de base — \textit{zero-shot}}
+        \begin{tabular}{ll}
+          R²  & \textbf{0.9564} \\
+          MAE & 0.025 \\
+          17/18 con error & $<$ 0.05 \\
+        \end{tabular}
+
+        \medskip
+        \small El OOS supera ligeramente al CV $\Rightarrow$ sin sobreajuste.
       \end{block}
 
     \column{0.48\textwidth}
-      \begin{exampleblock}{¿Por qué el OOS es mejor que el CV?}
-        El R² fuera de muestra (0.9564) es ligeramente \textit{mayor} que el CV interno (0.9525) — señal de que el modelo no está sobreajustado al conjunto de entrenamiento.
+      \begin{exampleblock}{Prueba extra — 10 canciones de Naruto (J-pop)}
+        \begin{tabular}{ll}
+          R²      & 0.856 \\
+          Pearson & 0.948 \\
+        \end{tabular}
+
+        \medskip
+        \small El \textit{ranking} es casi perfecto (Pearson~=~0.948), pero los valores absolutos se sobreestiman ~0.04--0.11. Este género está subrepresentado en las 137k canciones de entrenamiento.
       \end{exampleblock}
 
       \bigskip
-      \small
-      \textbf{Prueba extra — 10 canciones de Naruto (J-pop/J-rock):}
-      \begin{itemize}
-        \item R² = 0.856, Pearson = 0.948
-        \item El \textit{ranking} es casi perfecto; los valores absolutos se sobreestiman $\sim$0.04--0.11 (género subrepresentado en entrenamiento)
-      \end{itemize}
+      \begin{alertblock}{Modelo anterior (con key/chord)}
+        \small R²~=~0.548 fuera de muestra vs.\ \textbf{0.9564} del modelo actual.
+      \end{alertblock}
   \end{columns}
 
 \end{frame}
 
-% ── 6. Lecciones aprendidas ───────────────────────────────────────────────
+% ── 7. Lecciones aprendidas ───────────────────────────────────────────────
 \begin{frame}{Lecciones del proceso}
 
   \begin{enumerate}
-    \setlength{\itemsep}{10pt}
+    \setlength{\itemsep}{8pt}
+
+    \item \textbf{MI como exploración, Lasso como selección.}\\
+    \small La MI reveló los features más informativos y validó las decisiones del Lasso, pero no fue necesario hacer pre-filtrado manual: el Lasso llegó a conclusiones coherentes usando las 20 features.
 
     \item \textbf{La calidad de datos fue el mayor riesgo.}\\
-    \small Incluir \texttt{key} y \texttt{chord} (texto) infló el R² de entrenamiento a 0.99 pero destruyó la generalización (R²~=~0.548 OOS). Eliminarlos lo llevó a 0.9564.
+    \small \texttt{key} y \texttt{chord} como texto colapsaron la generalización (R²: 0.99~$\to$~0.548 OOS). Eliminarlos lo llevó a 0.9564.
 
-    \medskip
-    \item \textbf{El grado-2 es el punto óptimo de complejidad.}\\
-    \small La ingeniería de características (log, ratios, variables compuestas) aportó solo +0.0007 en R². No valió la pena sacrificar interpretabilidad.
+    \item \textbf{El grado-2 es el punto óptimo.}\\
+    \small La ingeniería adicional de features aportó solo +0.0007 en R². No valió la pena sacrificar interpretabilidad.
 
-    \medskip
-    \item \textbf{La validación cruzada es imprescindible.}\\
-    \small Un único split train/test puede dar estimaciones optimistas. Los 5 folds confirmaron R² estable y eliminaron la duda de sobreajuste.
-
-    \medskip
     \item \textbf{Una fórmula aritmética puede competir con un modelo de producción.}\\
-    \small 48 términos, completamente transparentes e inspeccionables, alcanzan la misma precisión que el pipeline de ML de producción.
+    \small 48 términos, completamente transparentes, alcanzan R²~=~0.9564 en datos nunca vistos durante el entrenamiento.
 
   \end{enumerate}
 

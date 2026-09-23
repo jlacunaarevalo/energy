@@ -1,0 +1,228 @@
+\documentclass[aspectratio=169]{beamer}
+\usetheme{Madrid}
+\usecolortheme{default}
+\usefonttheme{professionalfonts}
+
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{tikz}
+
+% Colors
+\definecolor{aspblue}{RGB}{30, 90, 160}
+\definecolor{aspgray}{RGB}{90, 90, 90}
+\definecolor{aspgreen}{RGB}{34, 139, 34}
+\definecolor{aspred}{RGB}{180, 30, 30}
+
+\setbeamercolor{frametitle}{bg=aspblue, fg=white}
+\setbeamercolor{title}{fg=white}
+\setbeamercolor{author}{fg=white}
+\setbeamercolor{date}{fg=white}
+\setbeamercolor{structure}{fg=aspblue}
+\setbeamercolor{palette primary}{bg=aspblue}
+\setbeamercolor{palette secondary}{bg=aspblue!80}
+\setbeamercolor{palette tertiary}{bg=aspblue!60}
+
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+
+\title{Construcción del Modelo de Predicción de aspEnergy}
+\subtitle{Regresión Polinomial con Lasso}
+\author{}
+\date{}
+
+\begin{document}
+
+% ── Portada ────────────────────────────────────────────────────────────────
+\begin{frame}
+  \titlepage
+\end{frame}
+
+% ── 1. Selección de características ───────────────────────────────────────
+\begin{frame}{Punto de partida: las características}
+
+  \textbf{23 campos numéricos de aspAudioFeatures disponibles.}
+
+  \bigskip
+  \begin{columns}
+    \column{0.48\textwidth}
+      \textbf{Incluidas (20):}
+      \small
+      \begin{itemize}
+        \item Mood: danceability, acoustic, aggressive, happy, party, relaxed, sad
+        \item Timbre: gender, voice, instrumental
+        \item Estilo: electronic, approachability, engagement
+        \item Físicas: bpm, loudness, intensity
+        \item Pitch: avg, max, median, std
+      \end{itemize}
+
+    \column{0.48\textwidth}
+      \textbf{\color{aspred}Excluidas (3):}
+      \small
+      \begin{itemize}
+        \item \texttt{key} — valor de texto (ej. ``Eb'')
+        \item \texttt{chord} — valor de texto (ej. ``C\#'')
+        \item \texttt{mode} — valor de texto
+      \end{itemize}
+      \bigskip
+      \begin{block}{\small ¿Por qué importa?}
+        \small Incluirlas en el modelo anterior causó coerción silenciosa a~0, inflando el R²~=~0.99 en entrenamiento pero colapsando a R²~=~0.548 fuera de muestra.
+      \end{block}
+  \end{columns}
+\end{frame}
+
+% ── 2. El enfoque: Polinomial + Lasso ─────────────────────────────────────
+\begin{frame}{El enfoque: Expansión Polinomial + Lasso}
+
+  \begin{block}{Motivación}
+    La energía perceptual no es lineal: una canción con alto \textit{aggressive} \textbf{y} alto \textit{relaxed} simultáneamente es distinta de una con solo uno de esos rasgos.
+  \end{block}
+
+  \bigskip
+  \begin{enumerate}
+    \item \textbf{Expansión grado-2:} generar todos los términos cuadráticos y productos cruzados
+    \[
+      20 \text{ features} \;\longrightarrow\; 230 \text{ términos posibles}
+    \]
+    \item \textbf{Estandarización:} \texttt{StandardScaler} — media 0, desviación estándar 1
+    \item \textbf{Lasso con validación cruzada:} \texttt{LassoCV} selecciona automáticamente el parámetro de regularización $\alpha$ y elimina los términos irrelevantes
+    \[
+      230 \text{ términos} \;\xrightarrow{\text{Lasso}}\; \mathbf{48 \text{ términos no nulos}}
+    \]
+  \end{enumerate}
+
+\end{frame}
+
+% ── 3. CV y Early Stopping ────────────────────────────────────────────────
+\begin{frame}{Validación cruzada y Early Stopping}
+
+  \textbf{¿Hasta qué punto vale la pena añadir complejidad?}
+
+  \bigskip
+  \begin{table}
+    \centering
+    \begin{tabular}{lcccc}
+      \toprule
+      \textbf{Configuración} & \textbf{R² (5-fold CV)} & \textbf{MAE} & \textbf{Ganancia} \\
+      \midrule
+      Grado-1 lineal (20 feat.)       & 0.9187 & 0.051 & — \\
+      Grado-2 polinomial (20 feat.)   & 0.9519 & 0.040 & +0.033 \\
+      Grado-2 + feat. ingenierizadas  & 0.9526 & 0.039 & \textcolor{aspred}{+0.0007} \\
+      \bottomrule
+    \end{tabular}
+  \end{table}
+
+  \bigskip
+  \begin{alertblock}{Early Stopping}
+    La ganancia al añadir \textit{log(bpm)}, ratios de mood y variables compuestas fue de solo \textbf{+0.0007} en R² — por debajo del umbral de 0.003. El proceso se detuvo en grado-2.
+  \end{alertblock}
+
+  \small
+  \textit{Los 5 folds mostraron R² estable (desviación estándar = 0.0004), confirmando que el modelo no está sobreajustado.}
+
+\end{frame}
+
+% ── 4. La fórmula ─────────────────────────────────────────────────────────
+\begin{frame}{La fórmula resultante}
+
+  \[
+    \widehat{\text{aspEnergy}} = \text{clip}\!\left(\,1.014 + \sum_{i} c_i \cdot t_i,\; 0,\; 1\right)
+  \]
+
+  \bigskip
+  \begin{columns}
+    \column{0.48\textwidth}
+      \textbf{\color{aspgreen}Términos positivos (aumentan energía):}
+      \small
+      \begin{itemize}
+        \item happy $\times$ sad \hfill (+0.367)
+        \item danceability $\times$ relaxed \hfill (+0.284)
+        \item aggressive $\times$ happy \hfill (+0.204)
+        \item aggressive $\times$ instrumental \hfill (+0.139)
+      \end{itemize}
+
+    \column{0.48\textwidth}
+      \textbf{\color{aspred}Términos negativos (reducen energía):}
+      \small
+      \begin{itemize}
+        \item aggressive $\times$ relaxed \hfill (−0.359)
+        \item relaxed \hfill (−0.291)
+        \item party $\times$ sad \hfill (−0.270)
+        \item relaxed $\times$ voice \hfill (−0.159)
+      \end{itemize}
+  \end{columns}
+
+  \bigskip
+  \begin{block}{Interpretación}
+    La energía emerge del \textbf{contraste emocional}, no de una sola dimensión. Una canción agresiva-y-relajada a la vez \textit{cancela} energía; una happy-y-sad simultánea la \textit{amplifica}.
+  \end{block}
+
+\end{frame}
+
+% ── 5. Resultados de validación ───────────────────────────────────────────
+\begin{frame}{Resultados de validación}
+
+  \begin{columns}
+    \column{0.48\textwidth}
+      \begin{block}{Validación interna (137k canciones)}
+        \begin{itemize}
+          \item \textbf{R²} = 0.9525
+          \item \textbf{MAE} = 0.039
+          \item \textbf{Sesgo} $\approx$ 0 (±0.0004)
+          \item Estable en los 5 folds
+        \end{itemize}
+      \end{block}
+
+      \bigskip
+      \begin{block}{18 canciones fuera de base (zero-shot)}
+        \begin{itemize}
+          \item \textbf{R²} = 0.9564
+          \item \textbf{MAE} = 0.025
+          \item 17 de 18 canciones con error $<$ 0.05
+        \end{itemize}
+      \end{block}
+
+    \column{0.48\textwidth}
+      \begin{exampleblock}{¿Por qué el OOS es mejor que el CV?}
+        El R² fuera de muestra (0.9564) es ligeramente \textit{mayor} que el CV interno (0.9525) — señal de que el modelo no está sobreajustado al conjunto de entrenamiento.
+      \end{exampleblock}
+
+      \bigskip
+      \small
+      \textbf{Prueba extra — 10 canciones de Naruto (J-pop/J-rock):}
+      \begin{itemize}
+        \item R² = 0.856, Pearson = 0.948
+        \item El \textit{ranking} es casi perfecto; los valores absolutos se sobreestiman $\sim$0.04--0.11 (género subrepresentado en entrenamiento)
+      \end{itemize}
+  \end{columns}
+
+\end{frame}
+
+% ── 6. Lecciones aprendidas ───────────────────────────────────────────────
+\begin{frame}{Lecciones del proceso}
+
+  \begin{enumerate}
+    \setlength{\itemsep}{10pt}
+
+    \item \textbf{La calidad de datos fue el mayor riesgo.}\\
+    \small Incluir \texttt{key} y \texttt{chord} (texto) infló el R² de entrenamiento a 0.99 pero destruyó la generalización (R²~=~0.548 OOS). Eliminarlos lo llevó a 0.9564.
+
+    \medskip
+    \item \textbf{El grado-2 es el punto óptimo de complejidad.}\\
+    \small La ingeniería de características (log, ratios, variables compuestas) aportó solo +0.0007 en R². No valió la pena sacrificar interpretabilidad.
+
+    \medskip
+    \item \textbf{La validación cruzada es imprescindible.}\\
+    \small Un único split train/test puede dar estimaciones optimistas. Los 5 folds confirmaron R² estable y eliminaron la duda de sobreajuste.
+
+    \medskip
+    \item \textbf{Una fórmula aritmética puede competir con un modelo de producción.}\\
+    \small 48 términos, completamente transparentes e inspeccionables, alcanzan la misma precisión que el pipeline de ML de producción.
+
+  \end{enumerate}
+
+\end{frame}
+
+\end{document}
